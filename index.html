@@ -445,21 +445,48 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-// ── Fetch Gallery ─────────────────────────────────────
-async function loadGallery() {
+// ── Fetch Gallery via JSONP (หลีกเลี่ยง CORS ของ GAS) ───────
+function loadGallery() {
   showSkeleton();
-  try {
-    const res  = await fetch(GAS_URL);
-    const data = await res.json();
-    if (!data.success) throw new Error(data.error);
-    allRecords = data.data.reverse(); // newest first
+
+  // JSONP: inject <script> tag → GAS ตอบ callbackFn({...})
+  const cbName = "_gasCb_" + Date.now();
+  const timeout = setTimeout(() => {
+    cleanup();
+    document.getElementById("gallery-container").innerHTML =
+      `<div class="empty-state"><div class="empty-icon">⚠️</div>โหลดข้อมูล Timeout<br><small>ตรวจสอบ GAS_URL และ Deploy อีกครั้ง</small></div>`;
+  }, 15000);
+
+  function cleanup() {
+    delete window[cbName];
+    const el = document.getElementById(cbName);
+    if (el) el.remove();
+  }
+
+  window[cbName] = function(data) {
+    clearTimeout(timeout);
+    cleanup();
+    if (!data.success) {
+      document.getElementById("gallery-container").innerHTML =
+        `<div class="empty-state"><div class="empty-icon">⚠️</div>โหลดข้อมูลไม่สำเร็จ<br><small>${data.error}</small></div>`;
+      return;
+    }
+    allRecords = data.data.reverse();
     buildTagFilter();
     filterGallery();
     document.getElementById("count-badge").textContent = `${allRecords.length} images`;
-  } catch (err) {
+  };
+
+  const script = document.createElement("script");
+  script.id  = cbName;
+  script.src = `${GAS_URL}?callback=${cbName}&t=${Date.now()}`;
+  script.onerror = () => {
+    clearTimeout(timeout);
+    cleanup();
     document.getElementById("gallery-container").innerHTML =
-      `<div class="empty-state"><div class="empty-icon">⚠️</div>โหลดข้อมูลไม่สำเร็จ<br><small>${err.message}</small></div>`;
-  }
+      `<div class="empty-state"><div class="empty-icon">⚠️</div>โหลดข้อมูลไม่สำเร็จ<br><small>ตรวจสอบ GAS_URL ว่าถูกต้องและ Deploy แล้ว</small></div>`;
+  };
+  document.head.appendChild(script);
 }
 
 function buildTagFilter() {
@@ -564,17 +591,25 @@ async function submitUpload() {
     imageMime   = selectedFile.type;
   }
 
-  setUploadStatus("กำลังอัปโหลด…", 30);
+  setUploadStatus("กำลังอัปโหลด…", 40);
+
   try {
-    const res = await fetch(GAS_URL, {
+    // POST แบบ no-cors — GAS รับได้ แต่ browser ไม่ให้อ่าน response
+    // ดังนั้น reload gallery หลัง delay เพื่อดึงข้อมูลใหม่ผ่าน JSONP
+    await fetch(GAS_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      mode:   "no-cors",           // ← แก้ปัญหา CORS preflight
+      headers: { "Content-Type": "text/plain" }, // no-cors ใช้ text/plain
       body: JSON.stringify({ prompt, model, tags, rating, imageBase64, imageName, imageMime })
     });
-    const data = await res.json();
-    if (!data.success) throw new Error(data.error);
-    setUploadStatus("บันทึกสำเร็จ! ✓", 100);
-    setTimeout(() => { closeUpload(); loadGallery(); toast("อัปโหลดสำเร็จ 🎉"); }, 800);
+
+    setUploadStatus("บันทึกสำเร็จ! รอโหลดผล…", 90);
+    // รอ GAS ประมวลผลเสร็จ (~2-4 วิ) แล้ว reload
+    setTimeout(() => {
+      setUploadStatus("เสร็จสิ้น ✓", 100);
+      setTimeout(() => { closeUpload(); loadGallery(); toast("อัปโหลดสำเร็จ 🎉"); }, 600);
+    }, 3500);
+
   } catch (err) {
     setUploadStatus("เกิดข้อผิดพลาด: " + err.message, 0);
     toast("อัปโหลดไม่สำเร็จ: " + err.message, "❌");
