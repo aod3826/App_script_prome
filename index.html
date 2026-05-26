@@ -153,6 +153,21 @@
   }
   .stars { color: var(--gold); font-size: .8rem; letter-spacing: 1px; }
 
+  /* ── Copy prompt button ── */
+  .card-copy {
+    display: flex; align-items: center; gap: 5px;
+    margin-top: 10px; width: 100%;
+    padding: 6px 10px; border-radius: 2px; border: none; cursor: pointer;
+    background: var(--warm); color: var(--muted);
+    font-family: 'Space Mono', monospace; font-size: .65rem; font-weight: 700;
+    letter-spacing: .05em; transition: all .15s;
+    opacity: 0; pointer-events: none;
+  }
+  .card:hover .card-copy { opacity: 1; pointer-events: auto; }
+  .card-copy:hover { background: var(--ink); color: var(--paper); }
+  .card-copy.copied { background: #2d6a4f; color: #fff; }
+  .card-copy svg { flex-shrink: 0; }
+
   /* ── Empty / Loading ── */
   .empty-state {
     text-align: center; padding: 80px 20px;
@@ -253,6 +268,41 @@
   }
   .upload-status { font-size: .78rem; color: var(--muted); margin-top: 8px; text-align: center; }
 
+  /* ── Export Modal ── */
+  .export-scope-btn {
+    flex: 1; padding: 10px 8px; border-radius: 2px; cursor: pointer;
+    font-family: 'Space Mono', monospace; font-size: .7rem; font-weight: 700;
+    letter-spacing: .05em; border: 1.5px solid var(--border);
+    background: transparent; color: var(--muted);
+    transition: all .15s;
+  }
+  .export-scope-btn.active { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .export-col-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
+  .export-col-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; border-radius: 2px;
+    border: 1.5px solid var(--border); cursor: pointer;
+    font-size: .8rem; transition: border-color .15s;
+  }
+  .export-col-item:hover { border-color: var(--ink); }
+  .export-col-item input[type=checkbox] { accent-color: var(--accent); width: 14px; height: 14px; cursor: pointer; }
+  .export-preview {
+    background: var(--warm); border-radius: 2px;
+    padding: 10px 12px; font-family: 'Space Mono', monospace;
+    font-size: .68rem; line-height: 1.7; color: var(--muted);
+    overflow-x: auto; white-space: pre; margin-top: 6px;
+    border: 1px solid var(--border);
+  }
+  .export-stat {
+    display: flex; gap: 16px; margin-top: 10px;
+  }
+  .export-stat-item { text-align: center; }
+  .export-stat-num {
+    font-family: 'Space Mono', monospace; font-size: 1.2rem;
+    font-weight: 700; color: var(--ink);
+  }
+  .export-stat-label { font-size: .68rem; color: var(--muted); }
+
   /* ── Config banner ── */
   #config-banner {
     background: #fff3cd; border: 1.5px solid #e0b830;
@@ -292,6 +342,7 @@
   <div class="header-actions">
     <span id="count-badge" style="font-family:'Space Mono',monospace;font-size:.72rem;color:#aaa;"></span>
     <button class="btn btn-ghost" onclick="loadGallery()">↻ Refresh</button>
+    <button class="btn btn-ghost" onclick="openExport()">⬇ Export</button>
     <button class="btn btn-primary" onclick="openUpload()">+ Upload</button>
   </div>
 </header>
@@ -384,6 +435,70 @@
   </div>
 </div>
 
+<!-- ── Export Modal ── -->
+<div class="modal-backdrop hidden" id="export-modal" onclick="closeExportBackdrop(event)">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-header">
+      <span>EXPORT CSV</span>
+      <button class="modal-close" onclick="document.getElementById('export-modal').classList.add('hidden')">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Stats -->
+      <div class="export-stat">
+        <div class="export-stat-item">
+          <div class="export-stat-num" id="ex-total">0</div>
+          <div class="export-stat-label">Total records</div>
+        </div>
+        <div class="export-stat-item">
+          <div class="export-stat-num" id="ex-scope-count">0</div>
+          <div class="export-stat-label">Will export</div>
+        </div>
+        <div class="export-stat-item">
+          <div class="export-stat-num" id="ex-col-count">8</div>
+          <div class="export-stat-label">Columns</div>
+        </div>
+      </div>
+
+      <!-- Scope -->
+      <div class="field" style="margin-top:18px">
+        <label>ขอบเขตข้อมูล</label>
+        <div style="display:flex;gap:8px">
+          <button class="export-scope-btn active" id="scope-all" onclick="setScope('all')">ทั้งหมด</button>
+          <button class="export-scope-btn" id="scope-filtered" onclick="setScope('filtered')">ที่กรองอยู่</button>
+          <button class="export-scope-btn" id="scope-rated" onclick="setScope('rated')">Rating ≥ 4★</button>
+        </div>
+      </div>
+
+      <!-- Columns -->
+      <div class="field">
+        <label>เลือก Columns</label>
+        <div style="display:flex;justify-content:flex-end;gap:12px;margin-bottom:6px">
+          <span style="font-size:.72rem;color:var(--accent);cursor:pointer;font-family:'Space Mono',monospace" onclick="toggleAllCols(true)">SELECT ALL</span>
+          <span style="font-size:.72rem;color:var(--muted);cursor:pointer;font-family:'Space Mono',monospace" onclick="toggleAllCols(false)">CLEAR</span>
+        </div>
+        <div class="export-col-grid" id="col-grid"></div>
+      </div>
+
+      <!-- CSV Preview -->
+      <div class="field">
+        <label>ตัวอย่าง (2 แถวแรก)</label>
+        <div class="export-preview" id="csv-preview">—</div>
+      </div>
+
+      <!-- Filename -->
+      <div class="field">
+        <label>ชื่อไฟล์</label>
+        <input type="text" id="export-filename" value="ai-image-vault-export.csv" oninput="updatePreview()">
+      </div>
+
+      <button class="btn btn-primary" style="width:100%;padding:14px;margin-top:4px" onclick="doExport()">
+        ⬇ DOWNLOAD CSV
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- ── Detail Modal ── -->
 <div class="modal-backdrop hidden" id="detail-modal" onclick="closeDetail(event)">
   <div class="modal" style="max-width:680px">
@@ -395,7 +510,20 @@
       <img id="detail-img" src="" alt="">
       <div style="margin-top:18px">
         <div class="detail-field">
-          <div class="detail-label">Prompt</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+            <div class="detail-label" style="margin-bottom:0">Prompt</div>
+            <button id="detail-copy-btn" onclick="copyDetailPrompt()" style="
+              display:flex;align-items:center;gap:5px;
+              padding:4px 10px;border-radius:2px;border:1.5px solid var(--border);
+              background:transparent;color:var(--muted);cursor:pointer;
+              font-family:'Space Mono',monospace;font-size:.65rem;font-weight:700;
+              letter-spacing:.05em;transition:all .15s;">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+              COPY
+            </button>
+          </div>
           <div class="detail-value" id="d-prompt"></div>
         </div>
         <div style="display:flex;gap:24px;flex-wrap:wrap">
@@ -428,7 +556,7 @@
 // ╔══════════════════════════════════════════════════════╗
 // ║  CONFIG — แก้ค่า GAS_URL ให้ตรงกับ Web App URL     ║
 // ╚══════════════════════════════════════════════════════╝
-const GAS_URL = "https://script.google.com/macros/s/AKfycbw3neh128gN2DdnLg0yO2xWM4FyxwPlS-sZAIPbOZCzkdizqOXGXpnV_Y8SKzMKqMUjtw/exec";
+const GAS_URL = "https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec";
 // ─────────────────────────────────────────────────────────
 
 let allRecords = [];
@@ -530,7 +658,9 @@ function renderGallery(records) {
     .map(t=>`<span class="card-tag">${t}</span>`).join("");
 
   wrap.innerHTML = `<div class="gallery">` +
-    records.map(r => `
+    records.map(r => {
+      const safePrompt = (r.prompt||"").replace(/'/g, "\\'").replace(/"/g, "&quot;");
+      return `
       <div class="card" onclick='openDetail(${JSON.stringify(r)})'>
         ${r.imageUrl
           ? `<img src="${r.imageUrl}" alt="${r.prompt}" loading="lazy" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Crect fill=%22%23e8e2d4%22 width=%22100%22 height=%22100%22/%3E%3Ctext y=%2250%22 x=%2250%22 text-anchor=%22middle%22 dy=%22.3em%22 font-size=%2230%22%3E🖼️%3C/text%3E%3C/svg%3E'">`
@@ -542,9 +672,15 @@ function renderGallery(records) {
             <span class="stars">${stars(r.rating)}</span>
           </div>
           <div class="card-tags" style="margin-top:8px">${tags(r)}</div>
+          <button class="card-copy" onclick="copyPrompt(event,'${safePrompt}',this)">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+            COPY PROMPT
+          </button>
         </div>
       </div>
-    `).join("") + `</div>`;
+    `}).join("") + `</div>`;
 }
 
 function showSkeleton() {
@@ -644,6 +780,53 @@ function toBase64(file) {
   });
 }
 
+// ── Copy Prompt ───────────────────────────────────────
+function copyPrompt(e, prompt, btn) {
+  e.stopPropagation();
+  navigator.clipboard.writeText(prompt).then(() => {
+    btn.classList.add("copied");
+    btn.innerHTML = `
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+      COPIED!`;
+    setTimeout(() => {
+      btn.classList.remove("copied");
+      btn.innerHTML = `
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+        </svg>
+        COPY PROMPT`;
+    }, 2000);
+  }).catch(() => toast("Copy ไม่สำเร็จ", "⚠️"));
+}
+
+function copyDetailPrompt() {
+  const prompt = document.getElementById("d-prompt").textContent;
+  const btn    = document.getElementById("detail-copy-btn");
+  if (!prompt || prompt === "—") return toast("ไม่มี prompt ที่จะ copy", "⚠️");
+  navigator.clipboard.writeText(prompt).then(() => {
+    btn.style.background = "#2d6a4f";
+    btn.style.color      = "#fff";
+    btn.style.borderColor = "#2d6a4f";
+    btn.innerHTML = `
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+      COPIED!`;
+    setTimeout(() => {
+      btn.style.background  = "";
+      btn.style.color       = "";
+      btn.style.borderColor = "";
+      btn.innerHTML = `
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+        </svg>
+        COPY`;
+    }, 2000);
+  }).catch(() => toast("Copy ไม่สำเร็จ", "⚠️"));
+}
+
 // ── Detail Modal ──────────────────────────────────────
 function openDetail(r) {
   const stars = n => "★".repeat(Math.max(0,Math.min(5,Number(n)||0))) + "☆".repeat(5-(Math.max(0,Math.min(5,Number(n)||0))));
@@ -670,11 +853,133 @@ function toast(msg, icon="✓") {
   setTimeout(() => el.classList.remove("show"), 3000);
 }
 
+// ── Export CSV ────────────────────────────────────────
+const CSV_COLS = [
+  { key: "id",          label: "ID" },
+  { key: "timestamp",   label: "Date" },
+  { key: "prompt",      label: "Prompt" },
+  { key: "model",       label: "Model" },
+  { key: "tags",        label: "Tags" },
+  { key: "rating",      label: "Rating" },
+  { key: "imageUrl",    label: "Image URL" },
+  { key: "driveFileId", label: "Drive File ID" },
+];
+
+let exportScope    = "all";
+let selectedCols   = new Set(CSV_COLS.map(c => c.key));
+
+function openExport() {
+  if (!allRecords.length) return toast("ยังไม่มีข้อมูล กด Refresh ก่อนครับ", "⚠️");
+  buildColGrid();
+  updatePreview();
+  document.getElementById("export-modal").classList.remove("hidden");
+}
+
+function closeExportBackdrop(e) {
+  if (e.target === document.getElementById("export-modal"))
+    document.getElementById("export-modal").classList.add("hidden");
+}
+
+function buildColGrid() {
+  const grid = document.getElementById("col-grid");
+  grid.innerHTML = CSV_COLS.map(c => `
+    <label class="export-col-item">
+      <input type="checkbox" data-key="${c.key}" ${selectedCols.has(c.key) ? "checked" : ""}
+        onchange="onColToggle(this)">
+      <span>${c.label}</span>
+    </label>
+  `).join("");
+}
+
+function onColToggle(el) {
+  el.checked ? selectedCols.add(el.dataset.key) : selectedCols.delete(el.dataset.key);
+  updatePreview();
+}
+
+function toggleAllCols(on) {
+  selectedCols = on ? new Set(CSV_COLS.map(c => c.key)) : new Set();
+  buildColGrid();
+  updatePreview();
+}
+
+function setScope(s) {
+  exportScope = s;
+  ["all","filtered","rated"].forEach(id =>
+    document.getElementById("scope-" + id).classList.toggle("active", id === s)
+  );
+  updatePreview();
+}
+
+function getScopedRecords() {
+  if (exportScope === "filtered") {
+    // ใช้ records ที่กรองอยู่ในหน้าจอ
+    const q = document.getElementById("search").value.toLowerCase();
+    return allRecords.filter(r => {
+      const matchTag  = !activeTag || (r.tags||"").split(",").map(t=>t.trim()).includes(activeTag);
+      const matchText = !q || (r.prompt+r.model+r.tags).toLowerCase().includes(q);
+      return matchTag && matchText;
+    });
+  }
+  if (exportScope === "rated") return allRecords.filter(r => Number(r.rating) >= 4);
+  return allRecords;
+}
+
+function escapeCSV(val) {
+  const s = String(val ?? "").replace(/"/g, '""');
+  return /[",\n\r]/.test(s) ? `"${s}"` : s;
+}
+
+function buildCSV(records) {
+  const cols = CSV_COLS.filter(c => selectedCols.has(c.key));
+  if (!cols.length) return "";
+  const header = cols.map(c => escapeCSV(c.label)).join(",");
+  const rows   = records.map(r => cols.map(c => escapeCSV(r[c.key])).join(","));
+  return [header, ...rows].join("\r\n");
+}
+
+function updatePreview() {
+  const scoped = getScopedRecords();
+  const cols   = CSV_COLS.filter(c => selectedCols.has(c.key));
+  document.getElementById("ex-total").textContent       = allRecords.length;
+  document.getElementById("ex-scope-count").textContent = scoped.length;
+  document.getElementById("ex-col-count").textContent   = cols.length;
+
+  if (!cols.length) {
+    document.getElementById("csv-preview").textContent = "— เลือก column อย่างน้อย 1 อัน —";
+    return;
+  }
+  const preview = buildCSV(scoped.slice(0, 2));
+  document.getElementById("csv-preview").textContent = preview || "— ไม่มีข้อมูล —";
+}
+
+function doExport() {
+  const cols = CSV_COLS.filter(c => selectedCols.has(c.key));
+  if (!cols.length) return toast("เลือก column อย่างน้อย 1 อัน", "⚠️");
+  const scoped = getScopedRecords();
+  if (!scoped.length) return toast("ไม่มีข้อมูลในขอบเขตที่เลือก", "⚠️");
+
+  const csv      = buildCSV(scoped);
+  const bom      = "\uFEFF";                          // BOM → Excel เปิดภาษาไทยถูก
+  const blob     = new Blob([bom + csv], { type: "text/csv;charset=utf-8;" });
+  const url      = URL.createObjectURL(blob);
+  const filename = document.getElementById("export-filename").value.trim() || "export.csv";
+
+  const a  = document.createElement("a");
+  a.href   = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+
+  toast(`Export สำเร็จ ${scoped.length} records (${cols.length} columns) 🎉`);
+  document.getElementById("export-modal").classList.add("hidden");
+}
+
 // ── ESC closes modals ─────────────────────────────────
 document.addEventListener("keydown", e => {
   if (e.key === "Escape") {
     closeUpload();
     document.getElementById("detail-modal").classList.add("hidden");
+    document.getElementById("export-modal").classList.add("hidden");
   }
 });
 </script>
