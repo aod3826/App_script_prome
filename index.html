@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AI Image Vault</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Sora:wght@300;400;600;800&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  /* ── Design tokens ── */
+  :root {
+    --ink:    #0d0d0f;
+    --paper:  #f5f2eb;
+    --warm:   #e8e2d4;
+    --accent: #c8502a;
+    --gold:   #d4a843;
+    --muted:  #6b6560;
+    --border: #ccc6b8;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Sora', sans-serif;
+    min-height: 100vh;
+  }
+
+  /* ── Grain overlay ── */
+  body::before {
+    content: "";
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    background-size: 200px;
+    opacity: .4;
+  }
+
+  /* ── Header ── */
+  header {
+    position: sticky; top: 0; z-index: 100;
+    background: var(--ink);
+    border-bottom: 2px solid var(--accent);
+    padding: 14px 32px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .logo {
+    font-family: 'Space Mono', monospace;
+    font-size: 1.1rem; font-weight: 700;
+    color: var(--paper);
+    letter-spacing: .08em;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); display: inline-block; }
+
+  .header-actions { display: flex; gap: 12px; align-items: center; }
+
+  /* ── Buttons ── */
+  .btn {
+    font-family: 'Space Mono', monospace;
+    font-size: .75rem; font-weight: 700; letter-spacing: .06em;
+    padding: 9px 18px; border-radius: 2px; border: none; cursor: pointer;
+    transition: all .15s ease;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #b03e1f; transform: translateY(-1px); }
+  .btn-ghost {
+    background: transparent; color: var(--paper);
+    border: 1.5px solid rgba(255,255,255,.25);
+  }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── Layout ── */
+  main { position: relative; z-index: 1; padding: 32px; max-width: 1600px; margin: 0 auto; }
+
+  /* ── Toolbar ── */
+  .toolbar {
+    display: flex; align-items: center; gap: 12px;
+    flex-wrap: wrap; margin-bottom: 28px;
+  }
+  .search-wrap {
+    flex: 1; min-width: 220px;
+    position: relative;
+  }
+  .search-wrap input {
+    width: 100%; padding: 10px 16px 10px 40px;
+    background: #fff; border: 1.5px solid var(--border);
+    border-radius: 2px; font-family: 'Sora', sans-serif; font-size: .85rem;
+    color: var(--ink); outline: none;
+    transition: border-color .15s;
+  }
+  .search-wrap input:focus { border-color: var(--accent); }
+  .search-icon {
+    position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+    color: var(--muted); pointer-events: none; font-size: .9rem;
+  }
+
+  .tag-filter {
+    display: flex; gap: 8px; flex-wrap: wrap;
+  }
+  .tag-chip {
+    font-family: 'Space Mono', monospace; font-size: .7rem; font-weight: 700;
+    padding: 5px 12px; border-radius: 100px;
+    border: 1.5px solid var(--border); background: transparent;
+    cursor: pointer; color: var(--muted);
+    transition: all .15s;
+  }
+  .tag-chip.active, .tag-chip:hover {
+    background: var(--ink); color: var(--paper); border-color: var(--ink);
+  }
+
+  /* ── Gallery grid ── */
+  .gallery {
+    columns: 4 280px; gap: 16px;
+  }
+  .card {
+    break-inside: avoid; margin-bottom: 16px;
+    background: #fff; border: 1.5px solid var(--border);
+    border-radius: 4px; overflow: hidden;
+    transition: transform .2s ease, box-shadow .2s ease;
+    cursor: pointer;
+  }
+  .card:hover {
+    transform: translateY(-4px);
+    box-shadow: 6px 6px 0 var(--ink);
+  }
+  .card img {
+    width: 100%; display: block;
+    aspect-ratio: 1; object-fit: cover;
+    background: var(--warm);
+  }
+  .card-body { padding: 12px 14px; }
+  .card-prompt {
+    font-size: .8rem; line-height: 1.5; color: var(--ink);
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .card-meta {
+    margin-top: 10px; display: flex; align-items: center;
+    justify-content: space-between; flex-wrap: wrap; gap: 6px;
+  }
+  .card-model {
+    font-family: 'Space Mono', monospace; font-size: .65rem;
+    color: var(--muted); background: var(--warm);
+    padding: 2px 8px; border-radius: 2px;
+  }
+  .card-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+  .card-tag {
+    font-size: .65rem; font-family: 'Space Mono', monospace;
+    padding: 2px 7px; border-radius: 100px;
+    background: var(--accent); color: #fff; opacity: .85;
+  }
+  .stars { color: var(--gold); font-size: .8rem; letter-spacing: 1px; }
+
+  /* ── Empty / Loading ── */
+  .empty-state {
+    text-align: center; padding: 80px 20px;
+    color: var(--muted); font-size: .9rem; line-height: 2;
+  }
+  .empty-icon { font-size: 3rem; opacity: .3; margin-bottom: 12px; }
+  .skeleton-grid { columns: 4 280px; gap: 16px; }
+  .skeleton-card {
+    break-inside: avoid; margin-bottom: 16px;
+    background: var(--warm); border-radius: 4px;
+    height: 260px; animation: pulse 1.5s infinite ease-in-out;
+  }
+  @keyframes pulse { 0%,100%{opacity:.5} 50%{opacity:1} }
+
+  /* ── Upload Modal ── */
+  .modal-backdrop {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(13,13,15,.7); backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  .modal-backdrop.hidden { display: none; }
+  .modal {
+    background: var(--paper); border: 2px solid var(--ink);
+    border-radius: 4px; width: 100%; max-width: 560px;
+    max-height: 90vh; overflow-y: auto;
+    box-shadow: 8px 8px 0 var(--ink);
+    animation: slideUp .25s ease;
+  }
+  @keyframes slideUp { from{transform:translateY(24px);opacity:0} to{transform:none;opacity:1} }
+  .modal-header {
+    background: var(--ink); color: var(--paper);
+    padding: 16px 24px; display: flex; align-items: center; justify-content: space-between;
+    font-family: 'Space Mono', monospace; font-size: .9rem; font-weight: 700;
+    letter-spacing: .06em;
+  }
+  .modal-close {
+    background: none; border: none; color: var(--paper);
+    font-size: 1.3rem; cursor: pointer; line-height: 1;
+    opacity: .7; transition: opacity .15s;
+  }
+  .modal-close:hover { opacity: 1; }
+  .modal-body { padding: 24px; }
+
+  .field { margin-bottom: 18px; }
+  .field label {
+    display: block; font-size: .72rem; font-weight: 600;
+    letter-spacing: .08em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 6px;
+    font-family: 'Space Mono', monospace;
+  }
+  .field input, .field textarea, .field select {
+    width: 100%; padding: 10px 14px;
+    background: #fff; border: 1.5px solid var(--border);
+    border-radius: 2px; font-family: 'Sora', sans-serif; font-size: .85rem;
+    color: var(--ink); outline: none; transition: border-color .15s;
+    resize: vertical;
+  }
+  .field input:focus, .field textarea:focus, .field select:focus {
+    border-color: var(--accent);
+  }
+
+  /* Drop zone */
+  .dropzone {
+    border: 2px dashed var(--border); border-radius: 4px;
+    padding: 32px; text-align: center; cursor: pointer;
+    transition: all .2s; background: var(--warm);
+  }
+  .dropzone:hover, .dropzone.dragover { border-color: var(--accent); background: #fdf0eb; }
+  .dropzone-icon { font-size: 2rem; opacity: .5; margin-bottom: 8px; }
+  .dropzone-text { font-size: .8rem; color: var(--muted); }
+  #preview-img {
+    width: 100%; border-radius: 4px; display: none;
+    max-height: 220px; object-fit: cover;
+    border: 1.5px solid var(--border); margin-top: 10px;
+  }
+
+  /* Stars selector */
+  .star-input { display: flex; gap: 6px; }
+  .star-input label {
+    font-size: 1.4rem; cursor: pointer; color: var(--border);
+    transition: color .1s; text-transform: none; letter-spacing: 0;
+  }
+  .star-input input { display: none; }
+  .star-input input:checked ~ label,
+  .star-input label:hover,
+  .star-input label:hover ~ label { color: var(--gold) !important; }
+
+  /* Upload progress */
+  .upload-bar {
+    height: 4px; background: var(--warm); border-radius: 2px;
+    overflow: hidden; margin-top: 16px; display: none;
+  }
+  .upload-bar-fill {
+    height: 100%; background: var(--accent);
+    width: 0%; transition: width .3s ease;
+    border-radius: 2px;
+  }
+  .upload-status { font-size: .78rem; color: var(--muted); margin-top: 8px; text-align: center; }
+
+  /* ── Config banner ── */
+  #config-banner {
+    background: #fff3cd; border: 1.5px solid #e0b830;
+    border-radius: 4px; padding: 14px 20px; margin-bottom: 24px;
+    font-size: .82rem; color: #7a5c00;
+    display: flex; align-items: center; gap: 10px;
+  }
+  #config-banner.hidden { display: none; }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed; bottom: 28px; right: 28px; z-index: 300;
+    background: var(--ink); color: var(--paper);
+    font-family: 'Space Mono', monospace; font-size: .75rem;
+    padding: 12px 20px; border-radius: 2px; border-left: 3px solid var(--accent);
+    transform: translateY(20px); opacity: 0;
+    transition: all .3s ease; pointer-events: none;
+  }
+  #toast.show { transform: none; opacity: 1; }
+
+  /* ── Detail Modal ── */
+  #detail-modal .modal { max-width: 720px; }
+  #detail-img { width: 100%; max-height: 420px; object-fit: contain; border-radius: 4px; background: var(--warm); }
+  .detail-field { margin-bottom: 12px; }
+  .detail-label { font-family: 'Space Mono',monospace; font-size:.7rem; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:4px; }
+  .detail-value { font-size:.88rem; line-height:1.6; }
+</style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header>
+  <div class="logo">
+    <span class="logo-dot"></span>
+    AI IMAGE VAULT
+  </div>
+  <div class="header-actions">
+    <span id="count-badge" style="font-family:'Space Mono',monospace;font-size:.72rem;color:#aaa;"></span>
+    <button class="btn btn-ghost" onclick="loadGallery()">↻ Refresh</button>
+    <button class="btn btn-primary" onclick="openUpload()">+ Upload</button>
+  </div>
+</header>
+
+<!-- ── Config Banner ── -->
+<main>
+  <div id="config-banner">
+    ⚠️ <strong>ตั้งค่า GAS_URL ก่อน:</strong> เปิดไฟล์นี้ แก้ค่า <code>GAS_URL</code> ในส่วน &lt;script&gt; ให้เป็น Web App URL ของ Google Apps Script
+  </div>
+
+  <!-- ── Toolbar ── -->
+  <div class="toolbar">
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="search" placeholder="ค้นหา prompt, model…" oninput="filterGallery()">
+    </div>
+    <div class="tag-filter" id="tag-filter"></div>
+  </div>
+
+  <!-- ── Gallery ── -->
+  <div id="gallery-container"></div>
+</main>
+
+<!-- ── Upload Modal ── -->
+<div class="modal-backdrop hidden" id="upload-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span>UPLOAD IMAGE</span>
+      <button class="modal-close" onclick="closeUpload()">✕</button>
+    </div>
+    <div class="modal-body">
+      <!-- Drop zone -->
+      <div class="field">
+        <label>รูปภาพ</label>
+        <div class="dropzone" id="dropzone" onclick="document.getElementById('file-input').click()"
+          ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
+          <div class="dropzone-icon">🖼️</div>
+          <div class="dropzone-text">คลิกหรือลากไฟล์มาวาง<br><small>PNG, JPG, WEBP ขนาดไม่เกิน 5 MB</small></div>
+        </div>
+        <img id="preview-img" alt="preview">
+        <input type="file" id="file-input" accept="image/*" style="display:none" onchange="handleFileSelect(event)">
+      </div>
+
+      <!-- Prompt -->
+      <div class="field">
+        <label>Prompt *</label>
+        <textarea id="f-prompt" rows="3" placeholder="A cinematic portrait of…"></textarea>
+      </div>
+
+      <!-- Model -->
+      <div class="field">
+        <label>Model</label>
+        <input type="text" id="f-model" placeholder="Midjourney, DALL-E 3, Flux…" list="model-list">
+        <datalist id="model-list">
+          <option value="Midjourney v6">
+          <option value="DALL-E 3">
+          <option value="Flux 1.1 Pro">
+          <option value="Stable Diffusion XL">
+          <option value="Adobe Firefly">
+          <option value="Ideogram">
+        </datalist>
+      </div>
+
+      <!-- Tags -->
+      <div class="field">
+        <label>Tags <small style="text-transform:none;letter-spacing:0;font-weight:400">(คั่นด้วยเครื่องหมาย ,)</small></label>
+        <input type="text" id="f-tags" placeholder="portrait, cinematic, dark">
+      </div>
+
+      <!-- Rating -->
+      <div class="field">
+        <label>Rating</label>
+        <div class="star-input" id="star-input">
+          <!-- Reverse trick for CSS-only hover -->
+          <input type="radio" name="rating" id="s5" value="5"><label for="s5">★</label>
+          <input type="radio" name="rating" id="s4" value="4"><label for="s4">★</label>
+          <input type="radio" name="rating" id="s3" value="3" checked><label for="s3">★</label>
+          <input type="radio" name="rating" id="s2" value="2"><label for="s2">★</label>
+          <input type="radio" name="rating" id="s1" value="1"><label for="s1">★</label>
+        </div>
+      </div>
+
+      <div class="upload-bar" id="upload-bar"><div class="upload-bar-fill" id="upload-fill"></div></div>
+      <div class="upload-status" id="upload-status"></div>
+
+      <button class="btn btn-primary" style="width:100%;margin-top:16px;padding:14px;" onclick="submitUpload()">
+        UPLOAD & SAVE
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Detail Modal ── -->
+<div class="modal-backdrop hidden" id="detail-modal" onclick="closeDetail(event)">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-header">
+      <span>IMAGE DETAIL</span>
+      <button class="modal-close" onclick="document.getElementById('detail-modal').classList.add('hidden')">✕</button>
+    </div>
+    <div class="modal-body">
+      <img id="detail-img" src="" alt="">
+      <div style="margin-top:18px">
+        <div class="detail-field">
+          <div class="detail-label">Prompt</div>
+          <div class="detail-value" id="d-prompt"></div>
+        </div>
+        <div style="display:flex;gap:24px;flex-wrap:wrap">
+          <div class="detail-field">
+            <div class="detail-label">Model</div>
+            <div class="detail-value" id="d-model"></div>
+          </div>
+          <div class="detail-field">
+            <div class="detail-label">Rating</div>
+            <div class="detail-value" id="d-rating"></div>
+          </div>
+          <div class="detail-field">
+            <div class="detail-label">Date</div>
+            <div class="detail-value" id="d-date"></div>
+          </div>
+        </div>
+        <div class="detail-field">
+          <div class="detail-label">Tags</div>
+          <div class="detail-value" id="d-tags" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Toast ── -->
+<div id="toast"></div>
+
+<script>
+// ╔══════════════════════════════════════════════════════╗
+// ║  CONFIG — แก้ค่า GAS_URL ให้ตรงกับ Web App URL     ║
+// ╚══════════════════════════════════════════════════════╝
+const GAS_URL = "https://script.google.com/macros/s/AKfycbw3neh128gN2DdnLg0yO2xWM4FyxwPlS-sZAIPbOZCzkdizqOXGXpnV_Y8SKzMKqMUjtw/exec";
+// ─────────────────────────────────────────────────────────
+
+let allRecords = [];
+let activeTag  = null;
+let selectedFile = null;
+
+// ── Init ──────────────────────────────────────────────
+document.addEventListener("DOMContentLoaded", () => {
+  if (GAS_URL.includes("YOUR_SCRIPT_ID")) {
+    document.getElementById("config-banner").classList.remove("hidden");
+  } else {
+    document.getElementById("config-banner").classList.add("hidden");
+    loadGallery();
+  }
+});
+
+// ── Fetch Gallery ─────────────────────────────────────
+async function loadGallery() {
+  showSkeleton();
+  try {
+    const res  = await fetch(GAS_URL);
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error);
+    allRecords = data.data.reverse(); // newest first
+    buildTagFilter();
+    filterGallery();
+    document.getElementById("count-badge").textContent = `${allRecords.length} images`;
+  } catch (err) {
+    document.getElementById("gallery-container").innerHTML =
+      `<div class="empty-state"><div class="empty-icon">⚠️</div>โหลดข้อมูลไม่สำเร็จ<br><small>${err.message}</small></div>`;
+  }
+}
+
+function buildTagFilter() {
+  const all = new Set();
+  allRecords.forEach(r => (r.tags||"").split(",").map(t=>t.trim()).filter(Boolean).forEach(t=>all.add(t)));
+  const wrap = document.getElementById("tag-filter");
+  wrap.innerHTML = `<button class="tag-chip ${!activeTag?'active':''}" onclick="setTag(null)">All</button>`;
+  [...all].sort().forEach(tag => {
+    const btn = document.createElement("button");
+    btn.className = "tag-chip" + (activeTag===tag?" active":"");
+    btn.textContent = tag;
+    btn.onclick = () => setTag(tag);
+    wrap.appendChild(btn);
+  });
+}
+
+function setTag(tag) {
+  activeTag = tag;
+  buildTagFilter();
+  filterGallery();
+}
+
+function filterGallery() {
+  const q = document.getElementById("search").value.toLowerCase();
+  const filtered = allRecords.filter(r => {
+    const matchTag  = !activeTag || (r.tags||"").split(",").map(t=>t.trim()).includes(activeTag);
+    const matchText = !q || (r.prompt+r.model+r.tags).toLowerCase().includes(q);
+    return matchTag && matchText;
+  });
+  renderGallery(filtered);
+}
+
+function renderGallery(records) {
+  const wrap = document.getElementById("gallery-container");
+  if (!records.length) {
+    wrap.innerHTML = `<div class="empty-state"><div class="empty-icon">🎨</div>ไม่พบรูปภาพ<br><small>ลองเปลี่ยน tag หรืออัปโหลดรูปแรกกันเลย</small></div>`;
+    return;
+  }
+  const stars = n => "★".repeat(Math.max(0,Math.min(5,Number(n)||0))) + "☆".repeat(5-Math.max(0,Math.min(5,Number(n)||0)));
+  const tags  = r => (r.tags||"").split(",").map(t=>t.trim()).filter(Boolean)
+    .map(t=>`<span class="card-tag">${t}</span>`).join("");
+
+  wrap.innerHTML = `<div class="gallery">` +
+    records.map(r => `
+      <div class="card" onclick='openDetail(${JSON.stringify(r)})'>
+        ${r.imageUrl
+          ? `<img src="${r.imageUrl}" alt="${r.prompt}" loading="lazy" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Crect fill=%22%23e8e2d4%22 width=%22100%22 height=%22100%22/%3E%3Ctext y=%2250%22 x=%2250%22 text-anchor=%22middle%22 dy=%22.3em%22 font-size=%2230%22%3E🖼️%3C/text%3E%3C/svg%3E'">`
+          : `<div style="aspect-ratio:1;background:var(--warm);display:flex;align-items:center;justify-content:center;font-size:2.5rem;opacity:.4">🖼️</div>`}
+        <div class="card-body">
+          <div class="card-prompt">${r.prompt||"—"}</div>
+          <div class="card-meta">
+            <span class="card-model">${r.model||"Unknown"}</span>
+            <span class="stars">${stars(r.rating)}</span>
+          </div>
+          <div class="card-tags" style="margin-top:8px">${tags(r)}</div>
+        </div>
+      </div>
+    `).join("") + `</div>`;
+}
+
+function showSkeleton() {
+  document.getElementById("gallery-container").innerHTML =
+    `<div class="skeleton-grid">${Array(8).fill('<div class="skeleton-card"></div>').join("")}</div>`;
+}
+
+// ── Upload Modal ──────────────────────────────────────
+function openUpload()  { document.getElementById("upload-modal").classList.remove("hidden"); }
+function closeUpload() {
+  document.getElementById("upload-modal").classList.add("hidden");
+  resetForm();
+}
+
+function handleDragOver(e)  { e.preventDefault(); document.getElementById("dropzone").classList.add("dragover"); }
+function handleDragLeave()  { document.getElementById("dropzone").classList.remove("dragover"); }
+function handleDrop(e)      { e.preventDefault(); handleDragLeave(); processFile(e.dataTransfer.files[0]); }
+function handleFileSelect(e){ processFile(e.target.files[0]); }
+
+function processFile(file) {
+  if (!file || !file.type.startsWith("image/")) return toast("กรุณาเลือกไฟล์รูปภาพ", "⚠️");
+  if (file.size > 5*1024*1024) return toast("ไฟล์ใหญ่เกิน 5 MB", "⚠️");
+  selectedFile = file;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = document.getElementById("preview-img");
+    img.src = e.target.result; img.style.display = "block";
+  };
+  reader.readAsDataURL(file);
+}
+
+async function submitUpload() {
+  const prompt = document.getElementById("f-prompt").value.trim();
+  if (!prompt) return toast("กรุณาใส่ Prompt", "⚠️");
+
+  const model  = document.getElementById("f-model").value.trim();
+  const tags   = document.getElementById("f-tags").value.split(",").map(t=>t.trim()).filter(Boolean);
+  const rating = document.querySelector('input[name="rating"]:checked')?.value || 3;
+
+  let imageBase64 = "", imageName = "", imageMime = "";
+  if (selectedFile) {
+    imageBase64 = await toBase64(selectedFile);
+    imageName   = selectedFile.name;
+    imageMime   = selectedFile.type;
+  }
+
+  setUploadStatus("กำลังอัปโหลด…", 30);
+  try {
+    const res = await fetch(GAS_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt, model, tags, rating, imageBase64, imageName, imageMime })
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error);
+    setUploadStatus("บันทึกสำเร็จ! ✓", 100);
+    setTimeout(() => { closeUpload(); loadGallery(); toast("อัปโหลดสำเร็จ 🎉"); }, 800);
+  } catch (err) {
+    setUploadStatus("เกิดข้อผิดพลาด: " + err.message, 0);
+    toast("อัปโหลดไม่สำเร็จ: " + err.message, "❌");
+  }
+}
+
+function setUploadStatus(msg, pct) {
+  const bar  = document.getElementById("upload-bar");
+  const fill = document.getElementById("upload-fill");
+  const st   = document.getElementById("upload-status");
+  bar.style.display = "block";
+  fill.style.width  = pct + "%";
+  st.textContent    = msg;
+}
+
+function resetForm() {
+  ["f-prompt","f-model","f-tags"].forEach(id => document.getElementById(id).value = "");
+  document.getElementById("s3").checked = true;
+  document.getElementById("preview-img").style.display = "none";
+  document.getElementById("upload-bar").style.display = "none";
+  document.getElementById("upload-status").textContent = "";
+  document.getElementById("file-input").value = "";
+  selectedFile = null;
+}
+
+function toBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = e => res(e.target.result.split(",")[1]);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+
+// ── Detail Modal ──────────────────────────────────────
+function openDetail(r) {
+  const stars = n => "★".repeat(Math.max(0,Math.min(5,Number(n)||0))) + "☆".repeat(5-(Math.max(0,Math.min(5,Number(n)||0))));
+  document.getElementById("detail-img").src = r.imageUrl || "";
+  document.getElementById("d-prompt").textContent = r.prompt || "—";
+  document.getElementById("d-model").textContent  = r.model  || "—";
+  document.getElementById("d-rating").innerHTML   = `<span class="stars">${stars(r.rating)}</span>`;
+  document.getElementById("d-date").textContent   = r.timestamp ? new Date(r.timestamp).toLocaleDateString("th-TH",{year:"numeric",month:"long",day:"numeric"}) : "—";
+  const tagsEl = document.getElementById("d-tags");
+  tagsEl.innerHTML = (r.tags||"").split(",").map(t=>t.trim()).filter(Boolean)
+    .map(t=>`<span class="card-tag" style="font-size:.75rem">${t}</span>`).join("") || "—";
+  document.getElementById("detail-modal").classList.remove("hidden");
+}
+function closeDetail(e) {
+  if (e.target === document.getElementById("detail-modal"))
+    document.getElementById("detail-modal").classList.add("hidden");
+}
+
+// ── Toast ─────────────────────────────────────────────
+function toast(msg, icon="✓") {
+  const el = document.getElementById("toast");
+  el.textContent = icon + " " + msg;
+  el.classList.add("show");
+  setTimeout(() => el.classList.remove("show"), 3000);
+}
+
+// ── ESC closes modals ─────────────────────────────────
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") {
+    closeUpload();
+    document.getElementById("detail-modal").classList.add("hidden");
+  }
+});
+</script>
+</body>
+</html>
