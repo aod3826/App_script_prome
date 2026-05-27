@@ -125,9 +125,22 @@
     transform: translateY(-4px);
     box-shadow: 6px 6px 0 var(--ink);
   }
-  .card img {
-    width: 100%; display: block;
-    aspect-ratio: 1; object-fit: cover;
+  /* ── Card image: natural ratio clamped to min/max ── */
+  .card-img-wrap {
+    width: 100%; overflow: hidden;
+    background: var(--warm);
+    /* แสดงสัดส่วนจริงของรูป แต่ไม่สูงเกิน 420px และไม่ต่ำกว่า 160px */
+    max-height: 420px; min-height: 160px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .card-img-wrap img {
+    width: 100%; height: 100%;
+    object-fit: cover; display: block;
+  }
+  .card-img-placeholder {
+    width: 100%; min-height: 200px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2.5rem; opacity: .4;
     background: var(--warm);
   }
   .card-body { padding: 12px 14px; }
@@ -256,17 +269,117 @@
   .star-input label:hover,
   .star-input label:hover ~ label { color: var(--gold) !important; }
 
-  /* Upload progress */
-  .upload-bar {
-    height: 4px; background: var(--warm); border-radius: 2px;
-    overflow: hidden; margin-top: 16px; display: none;
+  /* ── Orbital Ring Upload State ── */
+  .upload-overlay {
+    display: none;
+    flex-direction: column; align-items: center; justify-content: center;
+    gap: 18px; padding: 32px 24px 24px;
+    background: var(--paper);
   }
-  .upload-bar-fill {
-    height: 100%; background: var(--accent);
-    width: 0%; transition: width .3s ease;
-    border-radius: 2px;
+  .upload-overlay.active { display: flex; }
+
+  .orbital-wrap {
+    position: relative; width: 88px; height: 88px;
+    flex-shrink: 0;
   }
-  .upload-status { font-size: .78rem; color: var(--muted); margin-top: 8px; text-align: center; }
+  .orbital-icon-center {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; z-index: 3;
+    transition: transform .4s cubic-bezier(.17,.67,.4,1.3);
+  }
+  .orbital-ring {
+    position: absolute; inset: 0; border-radius: 50%;
+    border: 2.5px solid transparent;
+  }
+  .orbital-ring-1 {
+    border-top-color: var(--accent);
+    border-right-color: transparent;
+    animation: orb-spin 1.1s linear infinite;
+  }
+  .orbital-ring-2 {
+    inset: 10px;
+    border-top-color: transparent;
+    border-right-color: var(--gold);
+    border-bottom-color: transparent;
+    animation: orb-spin 1.7s linear infinite reverse;
+  }
+  .orbital-ring-3 {
+    inset: 20px;
+    border-top-color: var(--accent);
+    border-left-color: transparent;
+    border-right-color: transparent;
+    border-bottom-color: transparent;
+    opacity: .45;
+    animation: orb-spin 2.3s linear infinite;
+  }
+  @keyframes orb-spin { to { transform: rotate(360deg); } }
+
+  /* Progress track */
+  .orbital-progress-wrap { width: 100%; max-width: 220px; }
+  .orbital-progress-track {
+    height: 3px; border-radius: 2px;
+    background: var(--border); overflow: hidden; position: relative;
+  }
+  .orbital-progress-fill {
+    height: 100%; border-radius: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--gold));
+    width: 0%; transition: width .4s ease;
+    position: relative;
+  }
+  .orbital-progress-fill::after {
+    content: '';
+    position: absolute; right: 0; top: -2px;
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--gold);
+    box-shadow: 0 0 6px var(--gold);
+  }
+  .orbital-status-text {
+    font-family: 'Space Mono', monospace; font-size: .72rem;
+    color: var(--muted); text-align: center; letter-spacing: .04em;
+    min-height: 1.2em;
+  }
+
+  /* Success state */
+  .orbital-success {
+    display: none; flex-direction: column;
+    align-items: center; gap: 10px;
+  }
+  .orbital-success.active { display: flex; }
+  .success-ring-svg { overflow: visible; }
+  .success-ring-circle {
+    fill: none; stroke: #2d6a4f; stroke-width: 3;
+    stroke-dasharray: 251; stroke-dashoffset: 251;
+    stroke-linecap: round;
+    animation: draw-circle .55s ease forwards;
+  }
+  @keyframes draw-circle { to { stroke-dashoffset: 0; } }
+  .success-check-icon {
+    font-size: 30px;
+    animation: pop-in .35s cubic-bezier(.17,.67,.4,1.3) forwards .4s;
+    opacity: 0; display: block;
+  }
+  @keyframes pop-in { from{transform:scale(0);opacity:0} to{transform:scale(1);opacity:1} }
+  .success-burst {
+    position: absolute; border-radius: 50%;
+    animation: burst-out .5s ease-out forwards;
+    opacity: 0;
+  }
+  @keyframes burst-out {
+    0%   { transform: translate(var(--tx),var(--ty)) scale(1); opacity: .8; }
+    100% { transform: translate(calc(var(--tx)*2.8), calc(var(--ty)*2.8)) scale(0); opacity: 0; }
+  }
+  .success-label {
+    font-family: 'Space Mono', monospace; font-size: .78rem;
+    font-weight: 700; color: #2d6a4f; letter-spacing: .06em;
+  }
+  .success-sublabel {
+    font-size: .72rem; color: var(--muted); font-family: 'Space Mono', monospace;
+  }
+
+  /* Hide original bar when orbital is active */
+  .upload-bar { display: none !important; }
+  .upload-status { display: none !important; }
 
   /* ── Export Modal ── */
   .export-scope-btn {
@@ -427,6 +540,37 @@
 
       <div class="upload-bar" id="upload-bar"><div class="upload-bar-fill" id="upload-fill"></div></div>
       <div class="upload-status" id="upload-status"></div>
+
+      <!-- Orbital Ring Upload State -->
+      <div class="upload-overlay" id="upload-overlay">
+        <!-- Uploading state -->
+        <div id="orb-uploading" style="display:flex;flex-direction:column;align-items:center;gap:16px;width:100%">
+          <div class="orbital-wrap">
+            <div class="orbital-ring orbital-ring-1"></div>
+            <div class="orbital-ring orbital-ring-2"></div>
+            <div class="orbital-ring orbital-ring-3"></div>
+            <div class="orbital-icon-center" id="orb-icon">🖼️</div>
+          </div>
+          <div class="orbital-progress-wrap">
+            <div class="orbital-progress-track">
+              <div class="orbital-progress-fill" id="orb-fill"></div>
+            </div>
+          </div>
+          <div class="orbital-status-text" id="orb-text">Initializing…</div>
+        </div>
+
+        <!-- Success state (hidden until done) -->
+        <div class="orbital-success" id="orb-success">
+          <div style="position:relative;width:88px;height:88px;display:flex;align-items:center;justify-content:center;" id="orb-success-ring-wrap">
+            <svg class="success-ring-svg" width="88" height="88" viewBox="0 0 88 88" style="position:absolute;inset:0">
+              <circle cx="44" cy="44" r="38" class="success-ring-circle"/>
+            </svg>
+            <span class="success-check-icon" id="orb-check">✅</span>
+          </div>
+          <div class="success-label">SAVED TO VAULT</div>
+          <div class="success-sublabel" id="orb-filename">—</div>
+        </div>
+      </div>
 
       <button class="btn btn-primary" style="width:100%;margin-top:16px;padding:14px;" onclick="submitUpload()">
         UPLOAD & SAVE
@@ -663,8 +807,8 @@ function renderGallery(records) {
       return `
       <div class="card" onclick='openDetail(${JSON.stringify(r)})'>
         ${r.imageUrl
-          ? `<img src="${r.imageUrl}" alt="${r.prompt}" loading="lazy" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Crect fill=%22%23e8e2d4%22 width=%22100%22 height=%22100%22/%3E%3Ctext y=%2250%22 x=%2250%22 text-anchor=%22middle%22 dy=%22.3em%22 font-size=%2230%22%3E🖼️%3C/text%3E%3C/svg%3E'">`
-          : `<div style="aspect-ratio:1;background:var(--warm);display:flex;align-items:center;justify-content:center;font-size:2.5rem;opacity:.4">🖼️</div>`}
+          ? `<div class="card-img-wrap"><img src="${r.imageUrl}" alt="${r.prompt}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'card-img-placeholder\\'>🖼️</div>'"></div>`
+          : `<div class="card-img-placeholder">🖼️</div>`}
         <div class="card-body">
           <div class="card-prompt">${r.prompt||"—"}</div>
           <div class="card-meta">
@@ -692,6 +836,15 @@ function showSkeleton() {
 function openUpload()  { document.getElementById("upload-modal").classList.remove("hidden"); }
 function closeUpload() {
   document.getElementById("upload-modal").classList.add("hidden");
+  // Reset orbital state
+  const overlay = document.getElementById("upload-overlay");
+  overlay.classList.remove("active");
+  document.getElementById("orb-uploading").style.display = "flex";
+  document.getElementById("orb-success").classList.remove("active");
+  document.getElementById("orb-fill").style.width = "0%";
+  document.getElementById("orb-text").textContent = "Initializing…";
+  const submitBtn = document.querySelector('#upload-modal .btn-primary');
+  if (submitBtn) submitBtn.style.display = "";
   resetForm();
 }
 
@@ -727,46 +880,88 @@ async function submitUpload() {
     imageMime   = selectedFile.type;
   }
 
-  setUploadStatus("กำลังอัปโหลด…", 40);
+  // ── Show orbital ring ──
+  const overlay    = document.getElementById("upload-overlay");
+  const uploading  = document.getElementById("orb-uploading");
+  const success    = document.getElementById("orb-success");
+  const fill       = document.getElementById("orb-fill");
+  const statusText = document.getElementById("orb-text");
+  const submitBtn  = document.querySelector('#upload-modal .btn-primary');
+
+  overlay.classList.add("active");
+  uploading.style.display = "flex";
+  success.classList.remove("active");
+  submitBtn.style.display = "none";
+
+  // Simulate progress stages while waiting for GAS
+  const stages = [
+    { pct: 15, text: "Preparing image…",       delay: 0   },
+    { pct: 35, text: "Encoding to base64…",    delay: 400 },
+    { pct: 55, text: "Uploading to Drive…",    delay: 900 },
+    { pct: 72, text: "Saving to Sheet…",       delay: 1800 },
+    { pct: 88, text: "Processing on server…",  delay: 2600 },
+  ];
+  stages.forEach(s => setTimeout(() => {
+    fill.style.width = s.pct + "%";
+    statusText.textContent = s.text;
+  }, s.delay));
 
   try {
-    // POST แบบ no-cors — GAS รับได้ แต่ browser ไม่ให้อ่าน response
-    // ดังนั้น reload gallery หลัง delay เพื่อดึงข้อมูลใหม่ผ่าน JSONP
     await fetch(GAS_URL, {
       method: "POST",
-      mode:   "no-cors",           // ← แก้ปัญหา CORS preflight
-      headers: { "Content-Type": "text/plain" }, // no-cors ใช้ text/plain
+      mode:   "no-cors",
+      headers: { "Content-Type": "text/plain" },
       body: JSON.stringify({ prompt, model, tags, rating, imageBase64, imageName, imageMime })
     });
 
-    setUploadStatus("บันทึกสำเร็จ! รอโหลดผล…", 90);
-    // รอ GAS ประมวลผลเสร็จ (~2-4 วิ) แล้ว reload
-    setTimeout(() => {
-      setUploadStatus("เสร็จสิ้น ✓", 100);
-      setTimeout(() => { closeUpload(); loadGallery(); toast("อัปโหลดสำเร็จ 🎉"); }, 600);
-    }, 3500);
+    // ── Transition to success ──
+    fill.style.width = "100%";
+    await new Promise(r => setTimeout(r, 400));
+
+    uploading.style.display = "none";
+    success.classList.add("active");
+    document.getElementById("orb-filename").textContent =
+      imageName ? `${imageName} · ${(selectedFile.size/1024/1024).toFixed(1)} MB` : "saved";
+
+    // Burst dots
+    spawnBursts();
+
+    await new Promise(r => setTimeout(r, 2200));
+    closeUpload();
+    loadGallery();
+    toast("อัปโหลดสำเร็จ 🎉");
 
   } catch (err) {
-    setUploadStatus("เกิดข้อผิดพลาด: " + err.message, 0);
+    overlay.classList.remove("active");
+    submitBtn.style.display = "";
     toast("อัปโหลดไม่สำเร็จ: " + err.message, "❌");
   }
 }
 
-function setUploadStatus(msg, pct) {
-  const bar  = document.getElementById("upload-bar");
-  const fill = document.getElementById("upload-fill");
-  const st   = document.getElementById("upload-status");
-  bar.style.display = "block";
-  fill.style.width  = pct + "%";
-  st.textContent    = msg;
+function spawnBursts() {
+  const wrap = document.getElementById("orb-success-ring-wrap");
+  const colors = ["var(--accent)", "var(--gold)", "#2d6a4f", "#534AB7"];
+  for (let i = 0; i < 10; i++) {
+    const angle = (i / 10) * Math.PI * 2;
+    const r = 44 + Math.random() * 10;
+    const dot = document.createElement("div");
+    dot.className = "success-burst";
+    dot.style.cssText = `
+      width:${5+Math.random()*4}px; height:${5+Math.random()*4}px;
+      background:${colors[i%colors.length]};
+      left:calc(50% - 3px); top:calc(50% - 3px);
+      --tx:${Math.cos(angle)*r}px; --ty:${Math.sin(angle)*r}px;
+      animation-delay:${i*0.03}s;
+    `;
+    wrap.appendChild(dot);
+    setTimeout(() => dot.remove(), 800);
+  }
 }
 
 function resetForm() {
   ["f-prompt","f-model","f-tags"].forEach(id => document.getElementById(id).value = "");
   document.getElementById("s3").checked = true;
   document.getElementById("preview-img").style.display = "none";
-  document.getElementById("upload-bar").style.display = "none";
-  document.getElementById("upload-status").textContent = "";
   document.getElementById("file-input").value = "";
   selectedFile = null;
 }
