@@ -1,0 +1,102 @@
+// ============================================================
+// Google Apps Script - AI Image Prompt Manager API
+// Deploy as: Web App → Execute as: Me → Who has access: Anyone
+// ============================================================
+
+const SHEET_ID   = "1WNGnBj4eRrGCoCawKG1PehHx2-4airoJ6DD2qeUMiZM";
+const FOLDER_ID  = "1WVoB5ts06ApV0MnZuCBibHAdjtEyStzJ";
+const SHEET_NAME = "Prompts";
+
+// ── Helpers ──────────────────────────────────────────────────
+
+function getSheet() {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  let sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_NAME);
+    sheet.appendRow(["id","timestamp","prompt","model","tags","rating","imageUrl","driveFileId"]);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+// ── GET: รองรับทั้ง JSONP (callback=xxx) และ JSON ────────────
+function doGet(e) {
+  try {
+    const sheet   = getSheet();
+    const rows    = sheet.getDataRange().getValues();
+    const headers = rows[0];
+    const records = rows.slice(1).map(row => {
+      const obj = {};
+      headers.forEach((h, i) => obj[h] = row[i]);
+      return obj;
+    }).filter(r => r.id);
+
+    const payload = JSON.stringify({ success: true, data: records });
+    const cb = e.parameter && e.parameter.callback;
+
+    // JSONP mode — browser เรียกผ่าน <script> tag ได้ ไม่ติด CORS
+    if (cb) {
+      return ContentService
+        .createTextOutput(`${cb}(${payload})`)
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+
+    // JSON mode (fallback / server-to-server)
+    return ContentService
+      .createTextOutput(payload)
+      .setMimeType(ContentService.MimeType.JSON);
+
+  } catch (err) {
+    const errPayload = JSON.stringify({ success: false, error: err.message });
+    const cb = e.parameter && e.parameter.callback;
+    if (cb) {
+      return ContentService
+        .createTextOutput(`${cb}(${errPayload})`)
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+    return ContentService.createTextOutput(errPayload).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ── POST: รับ JSON body ── อัปโหลดรูป + บันทึก Sheet ────────
+function doPost(e) {
+  try {
+    const payload = JSON.parse(e.postData.contents);
+    const { prompt, model, tags, rating, imageBase64, imageName, imageMime } = payload;
+
+    if (!prompt) return respond({ success: false, error: "prompt is required" });
+
+    // 1. อัปโหลดรูปเข้า Drive (ถ้ามี)
+    let imageUrl = "", driveFileId = "";
+    if (imageBase64 && imageName) {
+      const folder = DriveApp.getFolderById(FOLDER_ID);
+      const blob   = Utilities.newBlob(
+        Utilities.base64Decode(imageBase64),
+        imageMime || "image/jpeg",
+        imageName
+      );
+      const file = folder.createFile(blob);
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      driveFileId = file.getId();
+      imageUrl    = `https://lh3.googleusercontent.com/d/${driveFileId}`;
+    }
+
+    // 2. บันทึกลง Sheet
+    const sheet  = getSheet();
+    const id     = Utilities.getUuid();
+    const ts     = new Date().toISOString();
+    const tagsStr = Array.isArray(tags) ? tags.join(",") : (tags || "");
+    sheet.appendRow([id, ts, prompt, model || "", tagsStr, Number(rating) || 0, imageUrl, driveFileId]);
+
+    return respond({ success: true, id, imageUrl });
+  } catch (err) {
+    return respond({ success: false, error: err.message });
+  }
+}
+
+function respond(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
