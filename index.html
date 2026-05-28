@@ -521,10 +521,29 @@
         <input type="file" id="file-input" accept="image/*" style="display:none" onchange="handleFileSelect(event)">
       </div>
 
-      <!-- Prompt -->
+      <!-- Prompt English -->
       <div class="field">
-        <label>Prompt *</label>
-        <textarea id="f-prompt" rows="3" placeholder="A cinematic portrait of…"></textarea>
+        <label>Prompt (English) *</label>
+        <textarea id="f-prompt" rows="3" placeholder="A cinematic portrait of…" oninput="onPromptChange()"></textarea>
+      </div>
+
+      <!-- Translate Button -->
+      <div class="field" style="margin-bottom: 8px;">
+        <button type="button" onclick="translatePrompt()" style="
+          width: 100%; padding: 10px 14px;
+          background: var(--accent); color: #fff;
+          border: none; border-radius: 2px; cursor: pointer;
+          font-family: 'Space Mono', monospace; font-size: .75rem; font-weight: 700;
+          letter-spacing: .06em; transition: all .15s;
+        " onmouseover="this.style.background='#b03e1f'" onmouseout="this.style.background='var(--accent)'">
+          🌐 TRANSLATE TO THAI
+        </button>
+      </div>
+
+      <!-- Prompt Thai -->
+      <div class="field">
+        <label>Prompt (ภาษาไทย)</label>
+        <textarea id="f-prompt-thai" rows="3" placeholder="ตัวอย่าง: ภาพสตูดิโอของบุคคล…"></textarea>
       </div>
 
       <!-- Model -->
@@ -692,6 +711,10 @@
           </div>
           <div class="detail-value" id="d-prompt"></div>
         </div>
+        <div class="detail-field" style="margin-top:16px">
+          <div class="detail-label" style="margin-bottom:4px">Prompt (ภาษาไทย)</div>
+          <div class="detail-value" id="d-prompt-thai"></div>
+        </div>
         <div style="display:flex;gap:24px;flex-wrap:wrap">
           <div class="detail-field">
             <div class="detail-label">Model</div>
@@ -825,7 +848,8 @@ function renderGallery(records) {
 
   wrap.innerHTML = `<div class="gallery">` +
     records.map(r => {
-      const safePrompt = (r.prompt||"").replace(/'/g, "\\'").replace(/"/g, "&quot;");
+      const safePrompt = (r.prompt||"").replace(/'/g, "\\\\\'")
+      const safePromptThai = (r.promptThai||"").replace(/'/g, "\\\\\'").replace(/"/g, "&quot;");
       return `
       <div class="card" onclick='openDetail(${JSON.stringify(r)})'>
         ${r.imageUrl
@@ -833,17 +857,26 @@ function renderGallery(records) {
           : `<div class="card-img-placeholder">🖼️</div>`}
         <div class="card-body">
           <div class="card-prompt">${r.prompt||"—"}</div>
+          ${r.promptThai ? `<div class="card-prompt" style="color:var(--muted);font-size:.75rem;margin-top:6px;opacity:.8">${r.promptThai}</div>` : ""}
           <div class="card-meta">
             <span class="card-model">${r.model||"Unknown"}</span>
             <span class="stars">${stars(r.rating)}</span>
           </div>
           <div class="card-tags" style="margin-top:8px">${tags(r)}</div>
-          <button class="card-copy" onclick="copyPrompt(event,'${safePrompt}',this)">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-            </svg>
-            COPY PROMPT
-          </button>
+          <div style="display:flex;gap:6px;margin-top:10px">
+            <button class="card-copy" style="flex:1;font-size:.6rem" onclick="copyPrompt(event,'${safePrompt}',this)">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+              EN
+            </button>
+            ${r.promptThai ? `<button class="card-copy" style="flex:1;font-size:.6rem" onclick="copyPrompt(event,'${safePromptThai}',this)">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+              TH
+            </button>` : ""}
+          </div>
         </div>
       </div>
     `}).join("") + `</div>`;
@@ -890,6 +923,7 @@ function processFile(file) {
 async function submitUpload() {
   const prompt = document.getElementById("f-prompt").value.trim();
   if (!prompt) return toast("กรุณาใส่ Prompt", "⚠️");
+  const promptThai = document.getElementById("f-prompt-thai").value.trim();
 
   const model  = document.getElementById("f-model").value.trim();
   const tags   = document.getElementById("f-tags").value.split(",").map(t=>t.trim()).filter(Boolean);
@@ -933,7 +967,7 @@ async function submitUpload() {
       method: "POST",
       mode:   "no-cors",
       headers: { "Content-Type": "text/plain" },
-      body: JSON.stringify({ prompt, model, tags, rating, imageBase64, imageName, imageMime })
+      body: JSON.stringify({ prompt, promptThai, model, tags, rating, imageBase64, imageName, imageMime })
     });
 
     // ── Transition to success ──
@@ -981,7 +1015,7 @@ function spawnBursts() {
 }
 
 function resetForm() {
-  ["f-prompt","f-model","f-tags"].forEach(id => document.getElementById(id).value = "");
+  ["f-prompt","f-prompt-thai","f-model","f-tags"].forEach(id => document.getElementById(id).value = "");
   document.getElementById("s3").checked = true;
   document.getElementById("preview-img").style.display = "none";
   document.getElementById("file-input").value = "";
@@ -995,6 +1029,53 @@ function toBase64(file) {
     r.onerror = rej;
     r.readAsDataURL(file);
   });
+}
+
+// ── Translation Helper ────────────────────────────────────────
+function onPromptChange() {
+  // Placeholder for future auto-save or validation
+}
+
+async function translatePrompt() {
+  const promptEn = document.getElementById("f-prompt").value.trim();
+  if (!promptEn) return toast("กรุณาใส่ Prompt ภาษาอังกฤษก่อน", "⚠️");
+  
+  const btn = event.target;
+  const originalText = btn.textContent;
+  btn.textContent = "⏳ Translating...";
+  btn.disabled = true;
+  
+  try {
+    const cbName = "_transCb_" + Date.now();
+    const timeout = setTimeout(() => {
+      delete window[cbName];
+      toast("แลก Timeout กรุณาลองคำรองอีกครั้ง", "⚠️");
+      btn.textContent = originalText;
+      btn.disabled = false;
+    }, 10000);
+    
+    window[cbName] = function(data) {
+      clearTimeout(timeout);
+      delete window[cbName];
+      if (data.success) {
+        document.getElementById("f-prompt-thai").value = data.translated;
+        toast("แลกสำเร็จ ✓️");
+      } else {
+        toast("แลกคำรองไม่สำเร็จ: " + data.error, "❌");
+      }
+      btn.textContent = originalText;
+      btn.disabled = false;
+    };
+    
+    const script = document.createElement("script");
+    script.src = GAS_URL + "?action=translate&text=" + encodeURIComponent(promptEn) + "&target=th&callback=" + cbName;
+    script.id = cbName;
+    document.head.appendChild(script);
+  } catch (err) {
+    toast("เกิดขอกวาง: " + err.message, "❌");
+    btn.textContent = originalText;
+    btn.disabled = false;
+  }
 }
 
 // ── Copy Prompt ───────────────────────────────────────
@@ -1049,6 +1130,9 @@ function openDetail(r) {
   const stars = n => "★".repeat(Math.max(0,Math.min(5,Number(n)||0))) + "☆".repeat(5-(Math.max(0,Math.min(5,Number(n)||0))));
   document.getElementById("detail-img").src = r.imageUrl || "";
   document.getElementById("d-prompt").textContent = r.prompt || "—";
+  if (document.getElementById("d-prompt-thai")) {
+    document.getElementById("d-prompt-thai").textContent = r.promptThai || "—";
+  }
   document.getElementById("d-model").textContent  = r.model  || "—";
   document.getElementById("d-rating").innerHTML   = `<span class="stars">${stars(r.rating)}</span>`;
   document.getElementById("d-date").textContent   = r.timestamp ? new Date(r.timestamp).toLocaleDateString("th-TH",{year:"numeric",month:"long",day:"numeric"}) : "—";
@@ -1074,7 +1158,8 @@ function toast(msg, icon="✓") {
 const CSV_COLS = [
   { key: "id",          label: "ID" },
   { key: "timestamp",   label: "Date" },
-  { key: "prompt",      label: "Prompt" },
+  { key: "prompt",      label: "Prompt (English)" },
+  { key: "promptThai",  label: "Prompt (Thai)" },
   { key: "model",       label: "Model" },
   { key: "tags",        label: "Tags" },
   { key: "rating",      label: "Rating" },
