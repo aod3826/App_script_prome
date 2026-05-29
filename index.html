@@ -112,13 +112,7 @@
 
   /* ── Gallery grid ── */
   .gallery {
-    columns: 2 160px; gap: 16px;
-  }
-  @media (min-width: 768px) {
-    .gallery { columns: 3 240px; gap: 24px; }
-  }
-  @media (min-width: 1024px) {
-    .gallery { columns: 4 280px; gap: 28px; }
+    columns: 4 280px; gap: 16px;
   }
   .card {
     break-inside: avoid; margin-bottom: 16px;
@@ -127,22 +121,16 @@
     transition: transform .2s ease, box-shadow .2s ease;
     cursor: pointer;
   }
-  @media (min-width: 768px) {
-    .card { margin-bottom: 24px; }
-  }
-  @media (min-width: 1024px) {
-    .card { margin-bottom: 28px; }
-  }
   .card:hover {
     transform: translateY(-4px);
     box-shadow: 6px 6px 0 var(--ink);
   }
-  /* ── Card image: 1:1 aspect ratio with center crop ── */
+  /* ── Card image: natural ratio clamped to min/max ── */
   .card-img-wrap {
     width: 100%; overflow: hidden;
     background: var(--warm);
-    /* Fixed 1:1 aspect ratio for consistent layout */
-    aspect-ratio: 1 / 1;
+    /* แสดงสัดส่วนจริงของรูป แต่ไม่สูงเกิน 420px และไม่ต่ำกว่า 160px */
+    max-height: 420px; min-height: 160px;
     display: flex; align-items: center; justify-content: center;
   }
   .card-img-wrap img {
@@ -180,17 +168,13 @@
 
   /* ── Copy prompt button ── */
   .card-copy {
-    display: flex; align-items: center; justify-content: center; gap: 5px;
+    display: flex; align-items: center; gap: 5px;
     margin-top: 10px; width: 100%;
-    padding: 10px 12px; border-radius: 2px; border: none; cursor: pointer;
+    padding: 6px 10px; border-radius: 2px; border: none; cursor: pointer;
     background: var(--warm); color: var(--muted);
     font-family: 'Space Mono', monospace; font-size: .65rem; font-weight: 700;
     letter-spacing: .05em; transition: all .15s;
-    opacity: 1; pointer-events: auto;
-    white-space: nowrap;
-  }
-  @media (min-width: 1024px) {
-    .card-copy { opacity: 0; pointer-events: none; font-size: .62rem; padding: 8px 12px; }
+    opacity: 0; pointer-events: none;
   }
   .card:hover .card-copy { opacity: 1; pointer-events: auto; }
   .card-copy:hover { background: var(--ink); color: var(--paper); }
@@ -203,13 +187,7 @@
     color: var(--muted); font-size: .9rem; line-height: 2;
   }
   .empty-icon { font-size: 3rem; opacity: .3; margin-bottom: 12px; }
-  .skeleton-grid { columns: 2 160px; gap: 16px; }
-  @media (min-width: 768px) {
-    .skeleton-grid { columns: 3 240px; gap: 24px; }
-  }
-  @media (min-width: 1024px) {
-    .skeleton-grid { columns: 4 280px; gap: 28px; }
-  }
+  .skeleton-grid { columns: 4 280px; gap: 16px; }
   .skeleton-card {
     break-inside: avoid; margin-bottom: 16px;
     background: var(--warm); border-radius: 4px;
@@ -464,6 +442,97 @@
   .detail-field { margin-bottom: 12px; }
   .detail-label { font-family: 'Space Mono',monospace; font-size:.7rem; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:4px; }
   .detail-value { font-size:.88rem; line-height:1.6; }
+
+  /* ── Translate Feature ── */
+  .prompt-box-wrap {
+    position: relative;
+  }
+  .prompt-box-wrap textarea {
+    padding-right: 44px !important;
+  }
+  .prompt-copy-btn {
+    position: absolute; top: 8px; right: 8px;
+    background: var(--warm); border: 1px solid var(--border);
+    border-radius: 2px; padding: 4px 7px; cursor: pointer;
+    color: var(--muted); font-size: .65rem;
+    font-family: 'Space Mono', monospace; font-weight: 700;
+    transition: all .15s; line-height: 1;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .prompt-copy-btn:hover { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .prompt-copy-btn.ok { background: #2d6a4f; color: #fff; border-color: #2d6a4f; }
+  .translate-bar {
+    display: flex; align-items: center; gap: 8px;
+    margin: 6px 0 10px;
+  }
+  .translate-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 7px 14px; border-radius: 2px; border: 1.5px solid var(--accent);
+    background: transparent; color: var(--accent); cursor: pointer;
+    font-family: 'Space Mono', monospace; font-size: .68rem; font-weight: 700;
+    letter-spacing: .05em; transition: all .15s; white-space: nowrap;
+  }
+  .translate-btn:hover { background: var(--accent); color: #fff; }
+  .translate-btn:disabled { opacity: .5; cursor: not-allowed; }
+  .translate-spin {
+    width: 12px; height: 12px; border-radius: 50%;
+    border: 2px solid transparent; border-top-color: currentColor;
+    animation: orb-spin .7s linear infinite; display: none;
+  }
+  .translate-btn.loading .translate-spin { display: block; }
+  .translate-hint { font-size: .7rem; color: var(--muted); }
+  .prompt-th-wrap {
+    position: relative; display: none;
+  }
+  .prompt-th-wrap.visible { display: block; }
+  .prompt-th-label {
+    display: flex; align-items: center; gap: 6px;
+    font-size: .72rem; font-weight: 600; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 6px;
+    font-family: 'Space Mono', monospace;
+  }
+  .th-badge {
+    background: #e8f4ec; color: #2d6a4f;
+    font-size: .6rem; padding: 1px 6px; border-radius: 100px;
+    font-weight: 700;
+  }
+  .prompt-th-wrap textarea {
+    background: #f8fdf9 !important;
+    border-color: #b8ddc6 !important;
+    padding-right: 44px !important;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    header { padding: 12px 16px; }
+    .logo { font-size: .85rem; }
+    .logo span:not(.logo-dot) { display: none; }
+    .logo::after { content: 'AI VAULT'; font-family: 'Space Mono',monospace; font-size:.85rem; color:var(--paper); font-weight:700; letter-spacing:.08em; }
+    .header-actions { gap: 6px; }
+    .btn { padding: 8px 10px; font-size: .65rem; letter-spacing: .03em; }
+    #count-badge { display: none; }
+    main { padding: 16px; }
+    .toolbar { gap: 8px; margin-bottom: 16px; }
+    .gallery { columns: 2 160px; gap: 10px; }
+    .card-body { padding: 8px 10px; }
+    .card-prompt { -webkit-line-clamp: 2; font-size: .75rem; }
+    .card-copy { opacity: 1 !important; pointer-events: auto !important; }
+    .modal { max-width: 100% !important; margin: 0; border-radius: 12px 12px 0 0 !important; max-height: 95vh !important; }
+    .modal-backdrop { align-items: flex-end; padding: 0; }
+    .modal-body { padding: 16px; }
+    .export-col-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 480px) {
+    .gallery { columns: 1; }
+    .header-actions .btn-ghost:not(:last-child) { display: none; }
+    .tag-filter { max-width: 100%; overflow-x: auto; flex-wrap: nowrap; padding-bottom: 4px; }
+    .tag-chip { flex-shrink: 0; }
+  }
+  @media (min-width: 769px) and (max-width: 1024px) {
+    main { padding: 20px 24px; }
+    .gallery { columns: 3 220px; gap: 14px; }
+    .modal { max-width: 480px !important; }
+  }
 </style>
 </head>
 <body>
@@ -521,56 +590,68 @@
         <input type="file" id="file-input" accept="image/*" style="display:none" onchange="handleFileSelect(event)">
       </div>
 
-      <!-- Prompt English -->
+      <!-- Prompt EN + Translate -->
       <div class="field">
-        <label>Prompt (English) *</label>
-        <textarea id="f-prompt" rows="3" placeholder="A cinematic portrait of…" oninput="onPromptChange()"></textarea>
+        <label>Prompt (EN) *</label>
+        <div class="prompt-box-wrap">
+          <textarea id="f-prompt" rows="3" placeholder="A cinematic portrait of…"></textarea>
+          <button class="prompt-copy-btn" onclick="copyFieldText('f-prompt',this)" title="Copy prompt">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            COPY
+          </button>
+        </div>
+        <div class="translate-bar">
+          <button class="translate-btn" id="translate-btn" onclick="translatePrompt()">
+            <span class="translate-spin" id="translate-spin"></span>
+            <span id="translate-btn-text">🌐 แปลเป็นภาษาไทย</span>
+          </button>
+          <span class="translate-hint" id="translate-hint">ใช้ Claude AI แปลอัตโนมัติ</span>
+        </div>
+        <!-- Prompt TH result -->
+        <div class="prompt-th-wrap" id="prompt-th-wrap">
+          <div class="prompt-th-label">
+            คำแปลภาษาไทย <span class="th-badge">AI</span>
+          </div>
+          <div class="prompt-box-wrap">
+            <textarea id="f-prompt-th" rows="3" placeholder="ผลการแปลจะแสดงที่นี่…" readonly></textarea>
+            <button class="prompt-copy-btn" onclick="copyFieldText('f-prompt-th',this)" title="Copy Thai prompt">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              COPY
+            </button>
+          </div>
+        </div>
       </div>
 
-      <!-- Translate Button -->
-      <div class="field" style="margin-bottom: 8px;">
-        <button type="button" onclick="translatePrompt()" style="
-          width: 100%; padding: 10px 14px;
-          background: var(--accent); color: #fff;
-          border: none; border-radius: 2px; cursor: pointer;
-          font-family: 'Space Mono', monospace; font-size: .75rem; font-weight: 700;
-          letter-spacing: .06em; transition: all .15s;
-        " onmouseover="this.style.background='#b03e1f'" onmouseout="this.style.background='var(--accent)'">
-          🌐 TRANSLATE TO THAI
-        </button>
+      <!-- Model + Tags in 2 col on desktop -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="field" style="margin-bottom:0">
+          <label>Model</label>
+          <input type="text" id="f-model" placeholder="Midjourney, DALL-E 3…" list="model-list">
+          <datalist id="model-list">
+            <option value="Midjourney v6">
+            <option value="DALL-E 3">
+            <option value="Flux 1.1 Pro">
+            <option value="Stable Diffusion XL">
+            <option value="Adobe Firefly">
+            <option value="Ideogram">
+          </datalist>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label>Tags <small style="text-transform:none;letter-spacing:0;font-weight:400">(คั่นด้วย ,)</small></label>
+          <input type="text" id="f-tags" placeholder="portrait, cinematic, dark">
+        </div>
       </div>
 
-      <!-- Prompt Thai -->
-      <div class="field">
-        <label>Prompt (ภาษาไทย)</label>
-        <textarea id="f-prompt-thai" rows="3" placeholder="ตัวอย่าง: ภาพสตูดิโอของบุคคล…"></textarea>
-      </div>
-
-      <!-- Model -->
-      <div class="field">
-        <label>Model</label>
-        <input type="text" id="f-model" placeholder="Midjourney, DALL-E 3, Flux…" list="model-list">
-        <datalist id="model-list">
-          <option value="Midjourney v6">
-          <option value="DALL-E 3">
-          <option value="Flux 1.1 Pro">
-          <option value="Stable Diffusion XL">
-          <option value="Adobe Firefly">
-          <option value="Ideogram">
-        </datalist>
-      </div>
-
-      <!-- Tags -->
-      <div class="field">
-        <label>Tags <small style="text-transform:none;letter-spacing:0;font-weight:400">(คั่นด้วยเครื่องหมาย ,)</small></label>
-        <input type="text" id="f-tags" placeholder="portrait, cinematic, dark">
+      <!-- Notes -->
+      <div class="field" style="margin-top:14px">
+        <label>รายละเอียดเพิ่มเติม <small style="text-transform:none;letter-spacing:0;font-weight:400">(ไม่บังคับ)</small></label>
+        <textarea id="f-notes" rows="2" placeholder="เช่น parameter ที่ใช้, seed, negative prompt, หรือบันทึกส่วนตัว…"></textarea>
       </div>
 
       <!-- Rating -->
       <div class="field">
         <label>Rating</label>
         <div class="star-input" id="star-input">
-          <!-- Reverse trick for CSS-only hover -->
           <input type="radio" name="rating" id="s5" value="5"><label for="s5">★</label>
           <input type="radio" name="rating" id="s4" value="4"><label for="s4">★</label>
           <input type="radio" name="rating" id="s3" value="3" checked><label for="s3">★</label>
@@ -711,10 +792,6 @@
           </div>
           <div class="detail-value" id="d-prompt"></div>
         </div>
-        <div class="detail-field" style="margin-top:16px">
-          <div class="detail-label" style="margin-bottom:4px">Prompt (ภาษาไทย)</div>
-          <div class="detail-value" id="d-prompt-thai"></div>
-        </div>
         <div style="display:flex;gap:24px;flex-wrap:wrap">
           <div class="detail-field">
             <div class="detail-label">Model</div>
@@ -733,6 +810,14 @@
           <div class="detail-label">Tags</div>
           <div class="detail-value" id="d-tags" style="display:flex;gap:6px;flex-wrap:wrap"></div>
         </div>
+        <div class="detail-field" id="d-promptTh-wrap" style="display:none">
+          <div class="detail-label">คำแปลภาษาไทย <span class="th-badge" style="vertical-align:middle">AI</span></div>
+          <div class="detail-value" id="d-promptTh" style="color:var(--muted)"></div>
+        </div>
+        <div class="detail-field" id="d-notes-wrap" style="display:none">
+          <div class="detail-label">รายละเอียดเพิ่มเติม</div>
+          <div class="detail-value" id="d-notes" style="white-space:pre-wrap;color:var(--muted)"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -745,7 +830,7 @@
 // ╔══════════════════════════════════════════════════════╗
 // ║  CONFIG — แก้ค่า GAS_URL ให้ตรงกับ Web App URL     ║
 // ╚══════════════════════════════════════════════════════╝
-const GAS_URL = "https://script.google.com/macros/s/AKfycbw3neh128gN2DdnLg0yO2xWM4FyxwPlS-sZAIPbOZCzkdizqOXGXpnV_Y8SKzMKqMUjtw/exec";
+const GAS_URL = "https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec";
 // ─────────────────────────────────────────────────────────
 
 let allRecords = [];
@@ -848,8 +933,7 @@ function renderGallery(records) {
 
   wrap.innerHTML = `<div class="gallery">` +
     records.map(r => {
-      const safePrompt = (r.prompt||"").replace(/'/g, "\\\\\'")
-      const safePromptThai = (r.promptThai||"").replace(/'/g, "\\\\\'").replace(/"/g, "&quot;");
+      const safePrompt = (r.prompt||"").replace(/'/g, "\\'").replace(/"/g, "&quot;");
       return `
       <div class="card" onclick='openDetail(${JSON.stringify(r)})'>
         ${r.imageUrl
@@ -857,26 +941,17 @@ function renderGallery(records) {
           : `<div class="card-img-placeholder">🖼️</div>`}
         <div class="card-body">
           <div class="card-prompt">${r.prompt||"—"}</div>
-          ${r.promptThai ? `<div class="card-prompt" style="color:var(--muted);font-size:.75rem;margin-top:6px;opacity:.8">${r.promptThai}</div>` : ""}
           <div class="card-meta">
             <span class="card-model">${r.model||"Unknown"}</span>
             <span class="stars">${stars(r.rating)}</span>
           </div>
           <div class="card-tags" style="margin-top:8px">${tags(r)}</div>
-          <div style="display:flex;gap:6px;margin-top:10px">
-            <button class="card-copy" style="flex:1;font-size:.6rem" onclick="copyPrompt(event,'${safePrompt}',this)">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-              </svg>
-              EN
-            </button>
-            ${r.promptThai ? `<button class="card-copy" style="flex:1;font-size:.6rem" onclick="copyPrompt(event,'${safePromptThai}',this)">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-              </svg>
-              TH
-            </button>` : ""}
-          </div>
+          <button class="card-copy" onclick="copyPrompt(event,'${safePrompt}',this)">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+            COPY PROMPT
+          </button>
         </div>
       </div>
     `}).join("") + `</div>`;
@@ -923,11 +998,12 @@ function processFile(file) {
 async function submitUpload() {
   const prompt = document.getElementById("f-prompt").value.trim();
   if (!prompt) return toast("กรุณาใส่ Prompt", "⚠️");
-  const promptThai = document.getElementById("f-prompt-thai").value.trim();
 
-  const model  = document.getElementById("f-model").value.trim();
-  const tags   = document.getElementById("f-tags").value.split(",").map(t=>t.trim()).filter(Boolean);
-  const rating = document.querySelector('input[name="rating"]:checked')?.value || 3;
+  const model    = document.getElementById("f-model").value.trim();
+  const tags     = document.getElementById("f-tags").value.split(",").map(t=>t.trim()).filter(Boolean);
+  const rating   = document.querySelector('input[name="rating"]:checked')?.value || 3;
+  const notes    = document.getElementById("f-notes").value.trim();
+  const promptTh = document.getElementById("f-prompt-th").value.trim();
 
   let imageBase64 = "", imageName = "", imageMime = "";
   if (selectedFile) {
@@ -949,11 +1025,10 @@ async function submitUpload() {
   success.classList.remove("active");
   submitBtn.style.display = "none";
 
-  // Simulate progress stages while waiting for GAS
   const stages = [
-    { pct: 15, text: "Preparing image…",       delay: 0   },
-    { pct: 35, text: "Encoding to base64…",    delay: 400 },
-    { pct: 55, text: "Uploading to Drive…",    delay: 900 },
+    { pct: 15, text: "Preparing image…",       delay: 0    },
+    { pct: 35, text: "Encoding to base64…",    delay: 400  },
+    { pct: 55, text: "Uploading to Drive…",    delay: 900  },
     { pct: 72, text: "Saving to Sheet…",       delay: 1800 },
     { pct: 88, text: "Processing on server…",  delay: 2600 },
   ];
@@ -967,10 +1042,9 @@ async function submitUpload() {
       method: "POST",
       mode:   "no-cors",
       headers: { "Content-Type": "text/plain" },
-      body: JSON.stringify({ prompt, promptThai, model, tags, rating, imageBase64, imageName, imageMime })
+      body: JSON.stringify({ prompt, model, tags, rating, notes, promptTh, imageBase64, imageName, imageMime })
     });
 
-    // ── Transition to success ──
     fill.style.width = "100%";
     await new Promise(r => setTimeout(r, 400));
 
@@ -979,7 +1053,6 @@ async function submitUpload() {
     document.getElementById("orb-filename").textContent =
       imageName ? `${imageName} · ${(selectedFile.size/1024/1024).toFixed(1)} MB` : "saved";
 
-    // Burst dots
     spawnBursts();
 
     await new Promise(r => setTimeout(r, 2200));
@@ -1015,10 +1088,17 @@ function spawnBursts() {
 }
 
 function resetForm() {
-  ["f-prompt","f-prompt-thai","f-model","f-tags"].forEach(id => document.getElementById(id).value = "");
+  ["f-prompt","f-model","f-tags","f-notes","f-prompt-th"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  });
   document.getElementById("s3").checked = true;
   document.getElementById("preview-img").style.display = "none";
   document.getElementById("file-input").value = "";
+  document.getElementById("prompt-th-wrap").classList.remove("visible");
+  document.getElementById("translate-btn").disabled = false;
+  document.getElementById("translate-btn").classList.remove("loading");
+  document.getElementById("translate-hint").textContent = "ใช้ Claude AI แปลอัตโนมัติ";
   selectedFile = null;
 }
 
@@ -1031,50 +1111,64 @@ function toBase64(file) {
   });
 }
 
-// ── Translation Helper ────────────────────────────────────────
-function onPromptChange() {
-  // Placeholder for future auto-save or validation
+// ── Copy field text (form fields) ────────────────────
+function copyFieldText(fieldId, btn) {
+  const val = document.getElementById(fieldId).value.trim();
+  if (!val) return toast("ไม่มีข้อความที่จะ copy", "⚠️");
+  navigator.clipboard.writeText(val).then(() => {
+    const orig = btn.innerHTML;
+    btn.classList.add("ok");
+    btn.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> OK`;
+    setTimeout(() => { btn.classList.remove("ok"); btn.innerHTML = orig; }, 2000);
+  }).catch(() => toast("Copy ไม่สำเร็จ", "⚠️"));
 }
 
+// ── Translate Prompt via Claude API ──────────────────
 async function translatePrompt() {
-  const promptEn = document.getElementById("f-prompt").value.trim();
-  if (!promptEn) return toast("กรุณาใส่ Prompt ภาษาอังกฤษก่อน", "⚠️");
-  
-  const btn = event.target;
-  const originalText = btn.textContent;
-  btn.textContent = "⏳ Translating...";
+  const prompt = document.getElementById("f-prompt").value.trim();
+  if (!prompt) return toast("กรุณาใส่ Prompt ก่อนแปล", "⚠️");
+
+  const btn      = document.getElementById("translate-btn");
+  const hint     = document.getElementById("translate-hint");
+  const thWrap   = document.getElementById("prompt-th-wrap");
+  const thBox    = document.getElementById("f-prompt-th");
+
   btn.disabled = true;
-  
+  btn.classList.add("loading");
+  document.getElementById("translate-btn-text").textContent = "กำลังแปล…";
+  hint.textContent = "Claude AI กำลังประมวลผล…";
+
   try {
-    const cbName = "_transCb_" + Date.now();
-    const timeout = setTimeout(() => {
-      delete window[cbName];
-      toast("แลก Timeout กรุณาลองคำรองอีกครั้ง", "⚠️");
-      btn.textContent = originalText;
-      btn.disabled = false;
-    }, 10000);
-    
-    window[cbName] = function(data) {
-      clearTimeout(timeout);
-      delete window[cbName];
-      if (data.success) {
-        document.getElementById("f-prompt-thai").value = data.translated;
-        toast("แลกสำเร็จ ✓️");
-      } else {
-        toast("แลกคำรองไม่สำเร็จ: " + data.error, "❌");
-      }
-      btn.textContent = originalText;
-      btn.disabled = false;
-    };
-    
-    const script = document.createElement("script");
-    script.src = GAS_URL + "?action=translate&text=" + encodeURIComponent(promptEn) + "&target=th&callback=" + cbName;
-    script.id = cbName;
-    document.head.appendChild(script);
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1000,
+        messages: [{
+          role: "user",
+          content: `แปลข้อความ AI image prompt ต่อไปนี้จากภาษาอังกฤษเป็นภาษาไทย ให้แปลตรงๆ และรักษาความหมายทางเทคนิคไว้ ตอบเฉพาะคำแปลภาษาไทยเท่านั้น ไม่ต้องมีคำอธิบายเพิ่มเติม:\n\n${prompt}`
+        }]
+      })
+    });
+
+    const data = await res.json();
+    const translated = data?.content?.[0]?.text || "";
+
+    if (!translated) throw new Error("ไม่ได้รับผลการแปล");
+
+    thBox.value = translated;
+    thWrap.classList.add("visible");
+    hint.textContent = "แปลสำเร็จ ✓";
+    toast("แปลภาษาสำเร็จ 🌐");
+
   } catch (err) {
-    toast("เกิดขอกวาง: " + err.message, "❌");
-    btn.textContent = originalText;
+    hint.textContent = "แปลไม่สำเร็จ: " + err.message;
+    toast("แปลไม่สำเร็จ", "⚠️");
+  } finally {
     btn.disabled = false;
+    btn.classList.remove("loading");
+    document.getElementById("translate-btn-text").textContent = "🌐 แปลเป็นภาษาไทย";
   }
 }
 
@@ -1130,15 +1224,33 @@ function openDetail(r) {
   const stars = n => "★".repeat(Math.max(0,Math.min(5,Number(n)||0))) + "☆".repeat(5-(Math.max(0,Math.min(5,Number(n)||0))));
   document.getElementById("detail-img").src = r.imageUrl || "";
   document.getElementById("d-prompt").textContent = r.prompt || "—";
-  if (document.getElementById("d-prompt-thai")) {
-    document.getElementById("d-prompt-thai").textContent = r.promptThai || "—";
-  }
   document.getElementById("d-model").textContent  = r.model  || "—";
   document.getElementById("d-rating").innerHTML   = `<span class="stars">${stars(r.rating)}</span>`;
   document.getElementById("d-date").textContent   = r.timestamp ? new Date(r.timestamp).toLocaleDateString("th-TH",{year:"numeric",month:"long",day:"numeric"}) : "—";
   const tagsEl = document.getElementById("d-tags");
   tagsEl.innerHTML = (r.tags||"").split(",").map(t=>t.trim()).filter(Boolean)
     .map(t=>`<span class="card-tag" style="font-size:.75rem">${t}</span>`).join("") || "—";
+
+  // promptTh
+  const promptThWrap = document.getElementById("d-promptTh-wrap");
+  const promptThEl   = document.getElementById("d-promptTh");
+  if (r.promptTh) {
+    promptThEl.textContent = r.promptTh;
+    promptThWrap.style.display = "";
+  } else {
+    promptThWrap.style.display = "none";
+  }
+
+  // notes
+  const notesWrap = document.getElementById("d-notes-wrap");
+  const notesEl   = document.getElementById("d-notes");
+  if (r.notes) {
+    notesEl.textContent = r.notes;
+    notesWrap.style.display = "";
+  } else {
+    notesWrap.style.display = "none";
+  }
+
   document.getElementById("detail-modal").classList.remove("hidden");
 }
 function closeDetail(e) {
@@ -1158,11 +1270,12 @@ function toast(msg, icon="✓") {
 const CSV_COLS = [
   { key: "id",          label: "ID" },
   { key: "timestamp",   label: "Date" },
-  { key: "prompt",      label: "Prompt (English)" },
-  { key: "promptThai",  label: "Prompt (Thai)" },
+  { key: "prompt",      label: "Prompt (EN)" },
+  { key: "promptTh",    label: "Prompt (TH)" },
   { key: "model",       label: "Model" },
   { key: "tags",        label: "Tags" },
   { key: "rating",      label: "Rating" },
+  { key: "notes",       label: "Notes" },
   { key: "imageUrl",    label: "Image URL" },
   { key: "driveFileId", label: "Drive File ID" },
 ];
