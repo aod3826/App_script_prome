@@ -1,0 +1,1483 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AI Image Vault</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#c8502a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AI Vault">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+
+<!-- OG / Share -->
+<meta property="og:title" content="AI Image Vault">
+<meta property="og:description" content="จัดการคลังภาพ AI Prompt ของคุณ">
+<meta property="og:image" content="icon-512.png">
+<meta name="description" content="AI Image Prompt Manager — จัดเก็บ ค้นหา และแปลภาษา Prompt ของคุณ">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Sora:wght@300;400;600;800&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  /* ── Design tokens ── */
+  :root {
+    --ink:    #0d0d0f;
+    --paper:  #f5f2eb;
+    --warm:   #e8e2d4;
+    --accent: #c8502a;
+    --gold:   #d4a843;
+    --muted:  #6b6560;
+    --border: #ccc6b8;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Sora', sans-serif;
+    min-height: 100vh;
+  }
+
+  /* ── Grain overlay ── */
+  body::before {
+    content: "";
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    background-size: 200px;
+    opacity: .4;
+  }
+
+  /* ── Header ── */
+  header {
+    position: sticky; top: 0; z-index: 100;
+    background: var(--ink);
+    border-bottom: 2px solid var(--accent);
+    padding: 14px 32px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .logo {
+    font-family: 'Space Mono', monospace;
+    font-size: 1.1rem; font-weight: 700;
+    color: var(--paper);
+    letter-spacing: .08em;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); display: inline-block; }
+
+  .header-actions { display: flex; gap: 12px; align-items: center; }
+
+  /* ── Buttons ── */
+  .btn {
+    font-family: 'Space Mono', monospace;
+    font-size: .75rem; font-weight: 700; letter-spacing: .06em;
+    padding: 9px 18px; border-radius: 2px; border: none; cursor: pointer;
+    transition: all .15s ease;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #b03e1f; transform: translateY(-1px); }
+  .btn-ghost {
+    background: transparent; color: var(--paper);
+    border: 1.5px solid rgba(255,255,255,.25);
+  }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── Layout ── */
+  main { position: relative; z-index: 1; padding: 32px; max-width: 1600px; margin: 0 auto; }
+
+  /* ── Toolbar ── */
+  .toolbar {
+    display: flex; align-items: center; gap: 12px;
+    flex-wrap: wrap; margin-bottom: 28px;
+  }
+  .search-wrap {
+    flex: 1; min-width: 220px;
+    position: relative;
+  }
+  .search-wrap input {
+    width: 100%; padding: 10px 16px 10px 40px;
+    background: #fff; border: 1.5px solid var(--border);
+    border-radius: 2px; font-family: 'Sora', sans-serif; font-size: .85rem;
+    color: var(--ink); outline: none;
+    transition: border-color .15s;
+  }
+  .search-wrap input:focus { border-color: var(--accent); }
+  .search-icon {
+    position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+    color: var(--muted); pointer-events: none; font-size: .9rem;
+  }
+
+  .tag-filter {
+    display: flex; gap: 8px; flex-wrap: wrap;
+  }
+  .tag-chip {
+    font-family: 'Space Mono', monospace; font-size: .7rem; font-weight: 700;
+    padding: 5px 12px; border-radius: 100px;
+    border: 1.5px solid var(--border); background: transparent;
+    cursor: pointer; color: var(--muted);
+    transition: all .15s;
+  }
+  .tag-chip.active, .tag-chip:hover {
+    background: var(--ink); color: var(--paper); border-color: var(--ink);
+  }
+
+  /* ── Gallery grid ── */
+  .gallery {
+    columns: 4 280px; gap: 16px;
+  }
+  .card {
+    break-inside: avoid; margin-bottom: 16px;
+    background: #fff; border: 1.5px solid var(--border);
+    border-radius: 4px; overflow: hidden;
+    transition: transform .2s ease, box-shadow .2s ease;
+    cursor: pointer;
+  }
+  .card:hover {
+    transform: translateY(-4px);
+    box-shadow: 6px 6px 0 var(--ink);
+  }
+  /* ── Card image: natural ratio clamped to min/max ── */
+  .card-img-wrap {
+    width: 100%; overflow: hidden;
+    background: var(--warm);
+    /* แสดงสัดส่วนจริงของรูป แต่ไม่สูงเกิน 420px และไม่ต่ำกว่า 160px */
+    max-height: 420px; min-height: 160px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .card-img-wrap img {
+    width: 100%; height: 100%;
+    object-fit: cover; display: block;
+  }
+  .card-img-placeholder {
+    width: 100%; min-height: 200px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2.5rem; opacity: .4;
+    background: var(--warm);
+  }
+  .card-body { padding: 12px 14px; }
+  .card-prompt {
+    font-size: .8rem; line-height: 1.5; color: var(--ink);
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .card-meta {
+    margin-top: 10px; display: flex; align-items: center;
+    justify-content: space-between; flex-wrap: wrap; gap: 6px;
+  }
+  .card-model {
+    font-family: 'Space Mono', monospace; font-size: .65rem;
+    color: var(--muted); background: var(--warm);
+    padding: 2px 8px; border-radius: 2px;
+  }
+  .card-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+  .card-tag {
+    font-size: .65rem; font-family: 'Space Mono', monospace;
+    padding: 2px 7px; border-radius: 100px;
+    background: var(--accent); color: #fff; opacity: .85;
+  }
+  .stars { color: var(--gold); font-size: .8rem; letter-spacing: 1px; }
+
+  /* ── Copy prompt button ── */
+  .card-copy {
+    display: flex; align-items: center; gap: 5px;
+    margin-top: 10px; width: 100%;
+    padding: 6px 10px; border-radius: 2px; border: none; cursor: pointer;
+    background: var(--warm); color: var(--muted);
+    font-family: 'Space Mono', monospace; font-size: .65rem; font-weight: 700;
+    letter-spacing: .05em; transition: all .15s;
+    opacity: 0; pointer-events: none;
+  }
+  .card:hover .card-copy { opacity: 1; pointer-events: auto; }
+  .card-copy:hover { background: var(--ink); color: var(--paper); }
+  .card-copy.copied { background: #2d6a4f; color: #fff; }
+  .card-copy svg { flex-shrink: 0; }
+
+  /* ── Empty / Loading ── */
+  .empty-state {
+    text-align: center; padding: 80px 20px;
+    color: var(--muted); font-size: .9rem; line-height: 2;
+  }
+  .empty-icon { font-size: 3rem; opacity: .3; margin-bottom: 12px; }
+  .skeleton-grid { columns: 4 280px; gap: 16px; }
+  .skeleton-card {
+    break-inside: avoid; margin-bottom: 16px;
+    background: var(--warm); border-radius: 4px;
+    height: 260px; animation: pulse 1.5s infinite ease-in-out;
+  }
+  @keyframes pulse { 0%,100%{opacity:.5} 50%{opacity:1} }
+
+  /* ── Upload Modal ── */
+  .modal-backdrop {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(13,13,15,.7); backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  .modal-backdrop.hidden { display: none; }
+  .modal {
+    background: var(--paper); border: 2px solid var(--ink);
+    border-radius: 4px; width: 100%; max-width: 560px;
+    max-height: 90vh; overflow-y: auto;
+    box-shadow: 8px 8px 0 var(--ink);
+    animation: slideUp .25s ease;
+  }
+  @keyframes slideUp { from{transform:translateY(24px);opacity:0} to{transform:none;opacity:1} }
+  .modal-header {
+    background: var(--ink); color: var(--paper);
+    padding: 16px 24px; display: flex; align-items: center; justify-content: space-between;
+    font-family: 'Space Mono', monospace; font-size: .9rem; font-weight: 700;
+    letter-spacing: .06em;
+  }
+  .modal-close {
+    background: none; border: none; color: var(--paper);
+    font-size: 1.3rem; cursor: pointer; line-height: 1;
+    opacity: .7; transition: opacity .15s;
+  }
+  .modal-close:hover { opacity: 1; }
+  .modal-body { padding: 24px; }
+
+  .field { margin-bottom: 18px; }
+  .field label {
+    display: block; font-size: .72rem; font-weight: 600;
+    letter-spacing: .08em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 6px;
+    font-family: 'Space Mono', monospace;
+  }
+  .field input, .field textarea, .field select {
+    width: 100%; padding: 10px 14px;
+    background: #fff; border: 1.5px solid var(--border);
+    border-radius: 2px; font-family: 'Sora', sans-serif; font-size: .85rem;
+    color: var(--ink); outline: none; transition: border-color .15s;
+    resize: vertical;
+  }
+  .field input:focus, .field textarea:focus, .field select:focus {
+    border-color: var(--accent);
+  }
+
+  /* Drop zone */
+  .dropzone {
+    border: 2px dashed var(--border); border-radius: 4px;
+    padding: 32px; text-align: center; cursor: pointer;
+    transition: all .2s; background: var(--warm);
+  }
+  .dropzone:hover, .dropzone.dragover { border-color: var(--accent); background: #fdf0eb; }
+  .dropzone-icon { font-size: 2rem; opacity: .5; margin-bottom: 8px; }
+  .dropzone-text { font-size: .8rem; color: var(--muted); }
+  #preview-img {
+    width: 100%; border-radius: 4px; display: none;
+    max-height: 220px; object-fit: cover;
+    border: 1.5px solid var(--border); margin-top: 10px;
+  }
+
+  /* Stars selector */
+  .star-input { display: flex; gap: 6px; }
+  .star-input label {
+    font-size: 1.4rem; cursor: pointer; color: var(--border);
+    transition: color .1s; text-transform: none; letter-spacing: 0;
+  }
+  .star-input input { display: none; }
+  .star-input input:checked ~ label,
+  .star-input label:hover,
+  .star-input label:hover ~ label { color: var(--gold) !important; }
+
+  /* ── Orbital Ring Upload State ── */
+  .upload-overlay {
+    display: none;
+    flex-direction: column; align-items: center; justify-content: center;
+    gap: 18px; padding: 32px 24px 24px;
+    background: var(--paper);
+  }
+  .upload-overlay.active { display: flex; }
+
+  .orbital-wrap {
+    position: relative; width: 88px; height: 88px;
+    flex-shrink: 0;
+  }
+  .orbital-icon-center {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; z-index: 3;
+    transition: transform .4s cubic-bezier(.17,.67,.4,1.3);
+  }
+  .orbital-ring {
+    position: absolute; inset: 0; border-radius: 50%;
+    border: 2.5px solid transparent;
+  }
+  .orbital-ring-1 {
+    border-top-color: var(--accent);
+    border-right-color: transparent;
+    animation: orb-spin 1.1s linear infinite;
+  }
+  .orbital-ring-2 {
+    inset: 10px;
+    border-top-color: transparent;
+    border-right-color: var(--gold);
+    border-bottom-color: transparent;
+    animation: orb-spin 1.7s linear infinite reverse;
+  }
+  .orbital-ring-3 {
+    inset: 20px;
+    border-top-color: var(--accent);
+    border-left-color: transparent;
+    border-right-color: transparent;
+    border-bottom-color: transparent;
+    opacity: .45;
+    animation: orb-spin 2.3s linear infinite;
+  }
+  @keyframes orb-spin { to { transform: rotate(360deg); } }
+
+  /* Progress track */
+  .orbital-progress-wrap { width: 100%; max-width: 220px; }
+  .orbital-progress-track {
+    height: 3px; border-radius: 2px;
+    background: var(--border); overflow: hidden; position: relative;
+  }
+  .orbital-progress-fill {
+    height: 100%; border-radius: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--gold));
+    width: 0%; transition: width .4s ease;
+    position: relative;
+  }
+  .orbital-progress-fill::after {
+    content: '';
+    position: absolute; right: 0; top: -2px;
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--gold);
+    box-shadow: 0 0 6px var(--gold);
+  }
+  .orbital-status-text {
+    font-family: 'Space Mono', monospace; font-size: .72rem;
+    color: var(--muted); text-align: center; letter-spacing: .04em;
+    min-height: 1.2em;
+  }
+
+  /* Success state */
+  .orbital-success {
+    display: none; flex-direction: column;
+    align-items: center; gap: 10px;
+  }
+  .orbital-success.active { display: flex; }
+  .success-ring-svg { overflow: visible; }
+  .success-ring-circle {
+    fill: none; stroke: #2d6a4f; stroke-width: 3;
+    stroke-dasharray: 251; stroke-dashoffset: 251;
+    stroke-linecap: round;
+    animation: draw-circle .55s ease forwards;
+  }
+  @keyframes draw-circle { to { stroke-dashoffset: 0; } }
+  .success-check-icon {
+    font-size: 30px;
+    animation: pop-in .35s cubic-bezier(.17,.67,.4,1.3) forwards .4s;
+    opacity: 0; display: block;
+  }
+  @keyframes pop-in { from{transform:scale(0);opacity:0} to{transform:scale(1);opacity:1} }
+  .success-burst {
+    position: absolute; border-radius: 50%;
+    animation: burst-out .5s ease-out forwards;
+    opacity: 0;
+  }
+  @keyframes burst-out {
+    0%   { transform: translate(var(--tx),var(--ty)) scale(1); opacity: .8; }
+    100% { transform: translate(calc(var(--tx)*2.8), calc(var(--ty)*2.8)) scale(0); opacity: 0; }
+  }
+  .success-label {
+    font-family: 'Space Mono', monospace; font-size: .78rem;
+    font-weight: 700; color: #2d6a4f; letter-spacing: .06em;
+  }
+  .success-sublabel {
+    font-size: .72rem; color: var(--muted); font-family: 'Space Mono', monospace;
+  }
+
+  /* Hide original bar when orbital is active */
+  .upload-bar { display: none !important; }
+  .upload-status { display: none !important; }
+
+  /* ── Export Modal ── */
+  .export-scope-btn {
+    flex: 1; padding: 10px 8px; border-radius: 2px; cursor: pointer;
+    font-family: 'Space Mono', monospace; font-size: .7rem; font-weight: 700;
+    letter-spacing: .05em; border: 1.5px solid var(--border);
+    background: transparent; color: var(--muted);
+    transition: all .15s;
+  }
+  .export-scope-btn.active { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .export-col-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
+  .export-col-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; border-radius: 2px;
+    border: 1.5px solid var(--border); cursor: pointer;
+    font-size: .8rem; transition: border-color .15s;
+  }
+  .export-col-item:hover { border-color: var(--ink); }
+  .export-col-item input[type=checkbox] { accent-color: var(--accent); width: 14px; height: 14px; cursor: pointer; }
+  .export-preview {
+    background: var(--warm); border-radius: 2px;
+    padding: 10px 12px; font-family: 'Space Mono', monospace;
+    font-size: .68rem; line-height: 1.7; color: var(--muted);
+    overflow-x: auto; white-space: pre; margin-top: 6px;
+    border: 1px solid var(--border);
+  }
+  .export-stat {
+    display: flex; gap: 16px; margin-top: 10px;
+  }
+  .export-stat-item { text-align: center; }
+  .export-stat-num {
+    font-family: 'Space Mono', monospace; font-size: 1.2rem;
+    font-weight: 700; color: var(--ink);
+  }
+  .export-stat-label { font-size: .68rem; color: var(--muted); }
+
+  /* ── Config banner ── */
+  #config-banner {
+    background: #fff3cd; border: 1.5px solid #e0b830;
+    border-radius: 4px; padding: 14px 20px; margin-bottom: 24px;
+    font-size: .82rem; color: #7a5c00;
+    display: flex; align-items: center; gap: 10px;
+  }
+  #config-banner.hidden { display: none; }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed; bottom: 28px; right: 28px; z-index: 300;
+    background: var(--ink); color: var(--paper);
+    font-family: 'Space Mono', monospace; font-size: .75rem;
+    padding: 12px 20px; border-radius: 2px; border-left: 3px solid var(--accent);
+    transform: translateY(20px); opacity: 0;
+    transition: all .3s ease; pointer-events: none;
+  }
+  #toast.show { transform: none; opacity: 1; }
+
+  /* ── Detail Modal ── */
+  #detail-modal .modal { max-width: 720px; }
+  #detail-img { width: 100%; max-height: 420px; object-fit: contain; border-radius: 4px; background: var(--warm); }
+  .detail-field { margin-bottom: 12px; }
+  .detail-label { font-family: 'Space Mono',monospace; font-size:.7rem; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:4px; }
+  .detail-value { font-size:.88rem; line-height:1.6; }
+
+  /* ── Translate Feature ── */
+  .prompt-box-wrap {
+    position: relative;
+  }
+  .prompt-box-wrap textarea {
+    padding-right: 44px !important;
+  }
+  .prompt-copy-btn {
+    position: absolute; top: 8px; right: 8px;
+    background: var(--warm); border: 1px solid var(--border);
+    border-radius: 2px; padding: 4px 7px; cursor: pointer;
+    color: var(--muted); font-size: .65rem;
+    font-family: 'Space Mono', monospace; font-weight: 700;
+    transition: all .15s; line-height: 1;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .prompt-copy-btn:hover { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .prompt-copy-btn.ok { background: #2d6a4f; color: #fff; border-color: #2d6a4f; }
+  .translate-bar {
+    display: flex; align-items: center; gap: 8px;
+    margin: 6px 0 10px;
+  }
+  .translate-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 7px 14px; border-radius: 2px; border: 1.5px solid var(--accent);
+    background: transparent; color: var(--accent); cursor: pointer;
+    font-family: 'Space Mono', monospace; font-size: .68rem; font-weight: 700;
+    letter-spacing: .05em; transition: all .15s; white-space: nowrap;
+  }
+  .translate-btn:hover { background: var(--accent); color: #fff; }
+  .translate-btn:disabled { opacity: .5; cursor: not-allowed; }
+  .translate-spin {
+    width: 12px; height: 12px; border-radius: 50%;
+    border: 2px solid transparent; border-top-color: currentColor;
+    animation: orb-spin .7s linear infinite; display: none;
+  }
+  .translate-btn.loading .translate-spin { display: block; }
+  .translate-hint { font-size: .7rem; color: var(--muted); }
+  .prompt-th-wrap {
+    position: relative; display: none;
+  }
+  .prompt-th-wrap.visible { display: block; }
+  .prompt-th-label {
+    display: flex; align-items: center; gap: 6px;
+    font-size: .72rem; font-weight: 600; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 6px;
+    font-family: 'Space Mono', monospace;
+  }
+  .th-badge {
+    background: #e8f4ec; color: #2d6a4f;
+    font-size: .6rem; padding: 1px 6px; border-radius: 100px;
+    font-weight: 700;
+  }
+  .prompt-th-wrap textarea {
+    background: #f8fdf9 !important;
+    border-color: #b8ddc6 !important;
+    padding-right: 44px !important;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    header { padding: 12px 16px; }
+    .logo { font-size: .85rem; }
+    .logo span:not(.logo-dot) { display: none; }
+    .logo::after { content: 'AI VAULT'; font-family: 'Space Mono',monospace; font-size:.85rem; color:var(--paper); font-weight:700; letter-spacing:.08em; }
+    .header-actions { gap: 6px; }
+    .btn { padding: 8px 10px; font-size: .65rem; letter-spacing: .03em; }
+    #count-badge { display: none; }
+    main { padding: 16px; }
+    .toolbar { gap: 8px; margin-bottom: 16px; }
+    .gallery { columns: 2 160px; gap: 10px; }
+    .card-body { padding: 8px 10px; }
+    .card-prompt { -webkit-line-clamp: 2; font-size: .75rem; }
+    .card-copy { opacity: 1 !important; pointer-events: auto !important; }
+    .modal { max-width: 100% !important; margin: 0; border-radius: 12px 12px 0 0 !important; max-height: 95vh !important; }
+    .modal-backdrop { align-items: flex-end; padding: 0; }
+    .modal-body { padding: 16px; }
+    .export-col-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 480px) {
+    .gallery { columns: 1; }
+    .header-actions .btn-ghost:not(:last-child) { display: none; }
+    .tag-filter { max-width: 100%; overflow-x: auto; flex-wrap: nowrap; padding-bottom: 4px; }
+    .tag-chip { flex-shrink: 0; }
+  }
+  @media (min-width: 769px) and (max-width: 1024px) {
+    main { padding: 20px 24px; }
+    .gallery { columns: 3 220px; gap: 14px; }
+    .modal { max-width: 480px !important; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header>
+  <div class="logo">
+    <span class="logo-dot"></span>
+    AI IMAGE VAULT
+  </div>
+  <div class="header-actions">
+    <span id="count-badge" style="font-family:'Space Mono',monospace;font-size:.72rem;color:#aaa;"></span>
+    <button class="btn btn-ghost" onclick="loadGallery()">↻ Refresh</button>
+    <button class="btn btn-ghost" onclick="openExport()">⬇ Export</button>
+    <button class="btn btn-primary" onclick="openUpload()">+ Upload</button>
+  </div>
+</header>
+
+<!-- ── Config Banner ── -->
+<!-- ── PWA Install Banner ── -->
+<div id="install-banner" style="display:none;
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:400;
+  background:var(--ink);color:var(--paper);
+  border:1.5px solid var(--accent);border-radius:4px;
+  padding:12px 18px;gap:14px;align-items:center;
+  box-shadow:4px 4px 0 var(--accent);
+  font-family:'Space Mono',monospace;font-size:.72rem;
+  max-width:calc(100vw - 32px);width:max-content;">
+  <span style="font-size:1.2rem">📲</span>
+  <span style="letter-spacing:.03em">ติดตั้ง AI Vault เป็นแอปบนหน้าจอ</span>
+  <button id="install-btn" style="
+    background:var(--accent);color:#fff;border:none;border-radius:2px;
+    padding:6px 14px;font-family:'Space Mono',monospace;font-size:.7rem;
+    font-weight:700;letter-spacing:.05em;cursor:pointer;white-space:nowrap;">
+    ติดตั้ง
+  </button>
+  <button id="install-dismiss" style="
+    background:transparent;border:none;color:#aaa;
+    font-size:1.1rem;cursor:pointer;line-height:1;padding:0 2px;">✕</button>
+</div>
+
+<main>
+  <div id="config-banner">
+    ⚠️ <strong>ตั้งค่า GAS_URL ก่อน:</strong> เปิดไฟล์นี้ แก้ค่า <code>GAS_URL</code> ในส่วน &lt;script&gt; ให้เป็น Web App URL ของ Google Apps Script
+  </div>
+
+  <!-- ── Toolbar ── -->
+  <div class="toolbar">
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="search" placeholder="ค้นหา prompt, model…" oninput="filterGallery()">
+    </div>
+    <div class="tag-filter" id="tag-filter"></div>
+  </div>
+
+  <!-- ── Gallery ── -->
+  <div id="gallery-container"></div>
+</main>
+
+<!-- ── Upload Modal ── -->
+<div class="modal-backdrop hidden" id="upload-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span>UPLOAD IMAGE</span>
+      <button class="modal-close" onclick="closeUpload()">✕</button>
+    </div>
+    <div class="modal-body">
+      <!-- Drop zone -->
+      <div class="field">
+        <label>รูปภาพ</label>
+        <div class="dropzone" id="dropzone" onclick="document.getElementById('file-input').click()"
+          ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
+          <div class="dropzone-icon">🖼️</div>
+          <div class="dropzone-text">คลิกหรือลากไฟล์มาวาง<br><small>PNG, JPG, WEBP ขนาดไม่เกิน 5 MB</small></div>
+        </div>
+        <img id="preview-img" alt="preview">
+        <input type="file" id="file-input" accept="image/*" style="display:none" onchange="handleFileSelect(event)">
+      </div>
+
+      <!-- Prompt EN + Translate -->
+      <div class="field">
+        <label>Prompt (EN) *</label>
+        <div class="prompt-box-wrap">
+          <textarea id="f-prompt" rows="3" placeholder="A cinematic portrait of…"></textarea>
+          <button class="prompt-copy-btn" onclick="copyFieldText('f-prompt',this)" title="Copy prompt">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            COPY
+          </button>
+        </div>
+        <div class="translate-bar">
+          <button class="translate-btn" id="translate-btn" onclick="translatePrompt()">
+            <span class="translate-spin" id="translate-spin"></span>
+            <span id="translate-btn-text">🌐 แปลเป็นภาษาไทย</span>
+          </button>
+          <span class="translate-hint" id="translate-hint">ใช้ Claude AI แปลอัตโนมัติ</span>
+        </div>
+        <!-- Prompt TH result -->
+        <div class="prompt-th-wrap" id="prompt-th-wrap">
+          <div class="prompt-th-label">
+            คำแปลภาษาไทย <span class="th-badge">AI</span>
+          </div>
+          <div class="prompt-box-wrap">
+            <textarea id="f-prompt-th" rows="3" placeholder="ผลการแปลจะแสดงที่นี่…" readonly></textarea>
+            <button class="prompt-copy-btn" onclick="copyFieldText('f-prompt-th',this)" title="Copy Thai prompt">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              COPY
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Model + Tags in 2 col on desktop -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="field" style="margin-bottom:0">
+          <label>Model</label>
+          <input type="text" id="f-model" placeholder="Midjourney, DALL-E 3…" list="model-list">
+          <datalist id="model-list">
+            <option value="Midjourney v6">
+            <option value="DALL-E 3">
+            <option value="Flux 1.1 Pro">
+            <option value="Stable Diffusion XL">
+            <option value="Adobe Firefly">
+            <option value="Ideogram">
+          </datalist>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label>Tags <small style="text-transform:none;letter-spacing:0;font-weight:400">(คั่นด้วย ,)</small></label>
+          <input type="text" id="f-tags" placeholder="portrait, cinematic, dark">
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <div class="field" style="margin-top:14px">
+        <label>รายละเอียดเพิ่มเติม <small style="text-transform:none;letter-spacing:0;font-weight:400">(ไม่บังคับ)</small></label>
+        <textarea id="f-notes" rows="2" placeholder="เช่น parameter ที่ใช้, seed, negative prompt, หรือบันทึกส่วนตัว…"></textarea>
+      </div>
+
+      <!-- Rating -->
+      <div class="field">
+        <label>Rating</label>
+        <div class="star-input" id="star-input">
+          <input type="radio" name="rating" id="s5" value="5"><label for="s5">★</label>
+          <input type="radio" name="rating" id="s4" value="4"><label for="s4">★</label>
+          <input type="radio" name="rating" id="s3" value="3" checked><label for="s3">★</label>
+          <input type="radio" name="rating" id="s2" value="2"><label for="s2">★</label>
+          <input type="radio" name="rating" id="s1" value="1"><label for="s1">★</label>
+        </div>
+      </div>
+
+      <div class="upload-bar" id="upload-bar"><div class="upload-bar-fill" id="upload-fill"></div></div>
+      <div class="upload-status" id="upload-status"></div>
+
+      <!-- Orbital Ring Upload State -->
+      <div class="upload-overlay" id="upload-overlay">
+        <!-- Uploading state -->
+        <div id="orb-uploading" style="display:flex;flex-direction:column;align-items:center;gap:16px;width:100%">
+          <div class="orbital-wrap">
+            <div class="orbital-ring orbital-ring-1"></div>
+            <div class="orbital-ring orbital-ring-2"></div>
+            <div class="orbital-ring orbital-ring-3"></div>
+            <div class="orbital-icon-center" id="orb-icon">🖼️</div>
+          </div>
+          <div class="orbital-progress-wrap">
+            <div class="orbital-progress-track">
+              <div class="orbital-progress-fill" id="orb-fill"></div>
+            </div>
+          </div>
+          <div class="orbital-status-text" id="orb-text">Initializing…</div>
+        </div>
+
+        <!-- Success state (hidden until done) -->
+        <div class="orbital-success" id="orb-success">
+          <div style="position:relative;width:88px;height:88px;display:flex;align-items:center;justify-content:center;" id="orb-success-ring-wrap">
+            <svg class="success-ring-svg" width="88" height="88" viewBox="0 0 88 88" style="position:absolute;inset:0">
+              <circle cx="44" cy="44" r="38" class="success-ring-circle"/>
+            </svg>
+            <span class="success-check-icon" id="orb-check">✅</span>
+          </div>
+          <div class="success-label">SAVED TO VAULT</div>
+          <div class="success-sublabel" id="orb-filename">—</div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" style="width:100%;margin-top:16px;padding:14px;" onclick="submitUpload()">
+        UPLOAD & SAVE
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Export Modal ── -->
+<div class="modal-backdrop hidden" id="export-modal" onclick="closeExportBackdrop(event)">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-header">
+      <span>EXPORT CSV</span>
+      <button class="modal-close" onclick="document.getElementById('export-modal').classList.add('hidden')">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Stats -->
+      <div class="export-stat">
+        <div class="export-stat-item">
+          <div class="export-stat-num" id="ex-total">0</div>
+          <div class="export-stat-label">Total records</div>
+        </div>
+        <div class="export-stat-item">
+          <div class="export-stat-num" id="ex-scope-count">0</div>
+          <div class="export-stat-label">Will export</div>
+        </div>
+        <div class="export-stat-item">
+          <div class="export-stat-num" id="ex-col-count">8</div>
+          <div class="export-stat-label">Columns</div>
+        </div>
+      </div>
+
+      <!-- Scope -->
+      <div class="field" style="margin-top:18px">
+        <label>ขอบเขตข้อมูล</label>
+        <div style="display:flex;gap:8px">
+          <button class="export-scope-btn active" id="scope-all" onclick="setScope('all')">ทั้งหมด</button>
+          <button class="export-scope-btn" id="scope-filtered" onclick="setScope('filtered')">ที่กรองอยู่</button>
+          <button class="export-scope-btn" id="scope-rated" onclick="setScope('rated')">Rating ≥ 4★</button>
+        </div>
+      </div>
+
+      <!-- Columns -->
+      <div class="field">
+        <label>เลือก Columns</label>
+        <div style="display:flex;justify-content:flex-end;gap:12px;margin-bottom:6px">
+          <span style="font-size:.72rem;color:var(--accent);cursor:pointer;font-family:'Space Mono',monospace" onclick="toggleAllCols(true)">SELECT ALL</span>
+          <span style="font-size:.72rem;color:var(--muted);cursor:pointer;font-family:'Space Mono',monospace" onclick="toggleAllCols(false)">CLEAR</span>
+        </div>
+        <div class="export-col-grid" id="col-grid"></div>
+      </div>
+
+      <!-- CSV Preview -->
+      <div class="field">
+        <label>ตัวอย่าง (2 แถวแรก)</label>
+        <div class="export-preview" id="csv-preview">—</div>
+      </div>
+
+      <!-- Filename -->
+      <div class="field">
+        <label>ชื่อไฟล์</label>
+        <input type="text" id="export-filename" value="ai-image-vault-export.csv" oninput="updatePreview()">
+      </div>
+
+      <button class="btn btn-primary" style="width:100%;padding:14px;margin-top:4px" onclick="doExport()">
+        ⬇ DOWNLOAD CSV
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Detail Modal ── -->
+<div class="modal-backdrop hidden" id="detail-modal" onclick="closeDetail(event)">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-header">
+      <span>IMAGE DETAIL</span>
+      <button class="modal-close" onclick="document.getElementById('detail-modal').classList.add('hidden')">✕</button>
+    </div>
+    <div class="modal-body">
+      <img id="detail-img" src="" alt="">
+      <div style="margin-top:18px">
+        <div class="detail-field">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+            <div class="detail-label" style="margin-bottom:0">Prompt</div>
+            <button id="detail-copy-btn" onclick="copyDetailPrompt()" style="
+              display:flex;align-items:center;gap:5px;
+              padding:4px 10px;border-radius:2px;border:1.5px solid var(--border);
+              background:transparent;color:var(--muted);cursor:pointer;
+              font-family:'Space Mono',monospace;font-size:.65rem;font-weight:700;
+              letter-spacing:.05em;transition:all .15s;">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+              COPY
+            </button>
+          </div>
+          <div class="detail-value" id="d-prompt"></div>
+        </div>
+        <div style="display:flex;gap:24px;flex-wrap:wrap">
+          <div class="detail-field">
+            <div class="detail-label">Model</div>
+            <div class="detail-value" id="d-model"></div>
+          </div>
+          <div class="detail-field">
+            <div class="detail-label">Rating</div>
+            <div class="detail-value" id="d-rating"></div>
+          </div>
+          <div class="detail-field">
+            <div class="detail-label">Date</div>
+            <div class="detail-value" id="d-date"></div>
+          </div>
+        </div>
+        <div class="detail-field">
+          <div class="detail-label">Tags</div>
+          <div class="detail-value" id="d-tags" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+        </div>
+        <div class="detail-field" id="d-promptTh-wrap" style="display:none">
+          <div class="detail-label">คำแปลภาษาไทย <span class="th-badge" style="vertical-align:middle">AI</span></div>
+          <div class="detail-value" id="d-promptTh" style="color:var(--muted)"></div>
+        </div>
+        <div class="detail-field" id="d-notes-wrap" style="display:none">
+          <div class="detail-label">รายละเอียดเพิ่มเติม</div>
+          <div class="detail-value" id="d-notes" style="white-space:pre-wrap;color:var(--muted)"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Toast ── -->
+<div id="toast"></div>
+
+<script>
+// ╔══════════════════════════════════════════════════════╗
+// ║  CONFIG — แก้ค่า GAS_URL ให้ตรงกับ Web App URL     ║
+// ╚══════════════════════════════════════════════════════╝
+const GAS_URL = "https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec";
+// ─────────────────────────────────────────────────────────
+
+let allRecords = [];
+let activeTag  = null;
+let selectedFile = null;
+
+// ── Init ──────────────────────────────────────────────
+document.addEventListener("DOMContentLoaded", () => {
+  if (GAS_URL.includes("YOUR_SCRIPT_ID")) {
+    document.getElementById("config-banner").classList.remove("hidden");
+  } else {
+    document.getElementById("config-banner").classList.add("hidden");
+    loadGallery();
+  }
+});
+
+// ── Fetch Gallery via JSONP (หลีกเลี่ยง CORS ของ GAS) ───────
+function loadGallery() {
+  showSkeleton();
+
+  // JSONP: inject <script> tag → GAS ตอบ callbackFn({...})
+  const cbName = "_gasCb_" + Date.now();
+  const timeout = setTimeout(() => {
+    cleanup();
+    document.getElementById("gallery-container").innerHTML =
+      `<div class="empty-state"><div class="empty-icon">⚠️</div>โหลดข้อมูล Timeout<br><small>ตรวจสอบ GAS_URL และ Deploy อีกครั้ง</small></div>`;
+  }, 15000);
+
+  function cleanup() {
+    delete window[cbName];
+    const el = document.getElementById(cbName);
+    if (el) el.remove();
+  }
+
+  window[cbName] = function(data) {
+    clearTimeout(timeout);
+    cleanup();
+    if (!data.success) {
+      document.getElementById("gallery-container").innerHTML =
+        `<div class="empty-state"><div class="empty-icon">⚠️</div>โหลดข้อมูลไม่สำเร็จ<br><small>${data.error}</small></div>`;
+      return;
+    }
+    allRecords = data.data.reverse();
+    buildTagFilter();
+    filterGallery();
+    document.getElementById("count-badge").textContent = `${allRecords.length} images`;
+  };
+
+  const script = document.createElement("script");
+  script.id  = cbName;
+  script.src = `${GAS_URL}?callback=${cbName}&t=${Date.now()}`;
+  script.onerror = () => {
+    clearTimeout(timeout);
+    cleanup();
+    document.getElementById("gallery-container").innerHTML =
+      `<div class="empty-state"><div class="empty-icon">⚠️</div>โหลดข้อมูลไม่สำเร็จ<br><small>ตรวจสอบ GAS_URL ว่าถูกต้องและ Deploy แล้ว</small></div>`;
+  };
+  document.head.appendChild(script);
+}
+
+function buildTagFilter() {
+  const all = new Set();
+  allRecords.forEach(r => (r.tags||"").split(",").map(t=>t.trim()).filter(Boolean).forEach(t=>all.add(t)));
+  const wrap = document.getElementById("tag-filter");
+  wrap.innerHTML = `<button class="tag-chip ${!activeTag?'active':''}" onclick="setTag(null)">All</button>`;
+  [...all].sort().forEach(tag => {
+    const btn = document.createElement("button");
+    btn.className = "tag-chip" + (activeTag===tag?" active":"");
+    btn.textContent = tag;
+    btn.onclick = () => setTag(tag);
+    wrap.appendChild(btn);
+  });
+}
+
+function setTag(tag) {
+  activeTag = tag;
+  buildTagFilter();
+  filterGallery();
+}
+
+function filterGallery() {
+  const q = document.getElementById("search").value.toLowerCase();
+  const filtered = allRecords.filter(r => {
+    const matchTag  = !activeTag || (r.tags||"").split(",").map(t=>t.trim()).includes(activeTag);
+    const matchText = !q || (r.prompt+r.model+r.tags).toLowerCase().includes(q);
+    return matchTag && matchText;
+  });
+  renderGallery(filtered);
+}
+
+function renderGallery(records) {
+  const wrap = document.getElementById("gallery-container");
+  if (!records.length) {
+    wrap.innerHTML = `<div class="empty-state"><div class="empty-icon">🎨</div>ไม่พบรูปภาพ<br><small>ลองเปลี่ยน tag หรืออัปโหลดรูปแรกกันเลย</small></div>`;
+    return;
+  }
+  const stars = n => "★".repeat(Math.max(0,Math.min(5,Number(n)||0))) + "☆".repeat(5-Math.max(0,Math.min(5,Number(n)||0)));
+  const tags  = r => (r.tags||"").split(",").map(t=>t.trim()).filter(Boolean)
+    .map(t=>`<span class="card-tag">${t}</span>`).join("");
+
+  wrap.innerHTML = `<div class="gallery">` +
+    records.map(r => {
+      const safePrompt = (r.prompt||"").replace(/'/g, "\\'").replace(/"/g, "&quot;");
+      return `
+      <div class="card" onclick='openDetail(${JSON.stringify(r)})'>
+        ${r.imageUrl
+          ? `<div class="card-img-wrap"><img src="${r.imageUrl}" alt="${r.prompt}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'card-img-placeholder\\'>🖼️</div>'"></div>`
+          : `<div class="card-img-placeholder">🖼️</div>`}
+        <div class="card-body">
+          <div class="card-prompt">${r.prompt||"—"}</div>
+          <div class="card-meta">
+            <span class="card-model">${r.model||"Unknown"}</span>
+            <span class="stars">${stars(r.rating)}</span>
+          </div>
+          <div class="card-tags" style="margin-top:8px">${tags(r)}</div>
+          <button class="card-copy" onclick="copyPrompt(event,'${safePrompt}',this)">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+            COPY PROMPT
+          </button>
+        </div>
+      </div>
+    `}).join("") + `</div>`;
+}
+
+function showSkeleton() {
+  document.getElementById("gallery-container").innerHTML =
+    `<div class="skeleton-grid">${Array(8).fill('<div class="skeleton-card"></div>').join("")}</div>`;
+}
+
+// ── Upload Modal ──────────────────────────────────────
+function openUpload()  { document.getElementById("upload-modal").classList.remove("hidden"); }
+function closeUpload() {
+  document.getElementById("upload-modal").classList.add("hidden");
+  // Reset orbital state
+  const overlay = document.getElementById("upload-overlay");
+  overlay.classList.remove("active");
+  document.getElementById("orb-uploading").style.display = "flex";
+  document.getElementById("orb-success").classList.remove("active");
+  document.getElementById("orb-fill").style.width = "0%";
+  document.getElementById("orb-text").textContent = "Initializing…";
+  const submitBtn = document.querySelector('#upload-modal .btn-primary');
+  if (submitBtn) submitBtn.style.display = "";
+  resetForm();
+}
+
+function handleDragOver(e)  { e.preventDefault(); document.getElementById("dropzone").classList.add("dragover"); }
+function handleDragLeave()  { document.getElementById("dropzone").classList.remove("dragover"); }
+function handleDrop(e)      { e.preventDefault(); handleDragLeave(); processFile(e.dataTransfer.files[0]); }
+function handleFileSelect(e){ processFile(e.target.files[0]); }
+
+function processFile(file) {
+  if (!file || !file.type.startsWith("image/")) return toast("กรุณาเลือกไฟล์รูปภาพ", "⚠️");
+  if (file.size > 5*1024*1024) return toast("ไฟล์ใหญ่เกิน 5 MB", "⚠️");
+  selectedFile = file;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = document.getElementById("preview-img");
+    img.src = e.target.result; img.style.display = "block";
+  };
+  reader.readAsDataURL(file);
+}
+
+async function submitUpload() {
+  const prompt = document.getElementById("f-prompt").value.trim();
+  if (!prompt) return toast("กรุณาใส่ Prompt", "⚠️");
+
+  const model    = document.getElementById("f-model").value.trim();
+  const tags     = document.getElementById("f-tags").value.split(",").map(t=>t.trim()).filter(Boolean);
+  const rating   = document.querySelector('input[name="rating"]:checked')?.value || 3;
+  const notes    = document.getElementById("f-notes").value.trim();
+  const promptTh = document.getElementById("f-prompt-th").value.trim();
+
+  let imageBase64 = "", imageName = "", imageMime = "";
+  if (selectedFile) {
+    imageBase64 = await toBase64(selectedFile);
+    imageName   = selectedFile.name;
+    imageMime   = selectedFile.type;
+  }
+
+  // ── Show orbital ring ──
+  const overlay    = document.getElementById("upload-overlay");
+  const uploading  = document.getElementById("orb-uploading");
+  const success    = document.getElementById("orb-success");
+  const fill       = document.getElementById("orb-fill");
+  const statusText = document.getElementById("orb-text");
+  const submitBtn  = document.querySelector('#upload-modal .btn-primary');
+
+  overlay.classList.add("active");
+  uploading.style.display = "flex";
+  success.classList.remove("active");
+  submitBtn.style.display = "none";
+
+  const stages = [
+    { pct: 15, text: "Preparing image…",       delay: 0    },
+    { pct: 35, text: "Encoding to base64…",    delay: 400  },
+    { pct: 55, text: "Uploading to Drive…",    delay: 900  },
+    { pct: 72, text: "Saving to Sheet…",       delay: 1800 },
+    { pct: 88, text: "Processing on server…",  delay: 2600 },
+  ];
+  stages.forEach(s => setTimeout(() => {
+    fill.style.width = s.pct + "%";
+    statusText.textContent = s.text;
+  }, s.delay));
+
+  try {
+    await fetch(GAS_URL, {
+      method: "POST",
+      mode:   "no-cors",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({ prompt, model, tags, rating, notes, promptTh, imageBase64, imageName, imageMime })
+    });
+
+    fill.style.width = "100%";
+    await new Promise(r => setTimeout(r, 400));
+
+    uploading.style.display = "none";
+    success.classList.add("active");
+    document.getElementById("orb-filename").textContent =
+      imageName ? `${imageName} · ${(selectedFile.size/1024/1024).toFixed(1)} MB` : "saved";
+
+    spawnBursts();
+
+    await new Promise(r => setTimeout(r, 2200));
+    closeUpload();
+    loadGallery();
+    toast("อัปโหลดสำเร็จ 🎉");
+
+  } catch (err) {
+    overlay.classList.remove("active");
+    submitBtn.style.display = "";
+    toast("อัปโหลดไม่สำเร็จ: " + err.message, "❌");
+  }
+}
+
+function spawnBursts() {
+  const wrap = document.getElementById("orb-success-ring-wrap");
+  const colors = ["var(--accent)", "var(--gold)", "#2d6a4f", "#534AB7"];
+  for (let i = 0; i < 10; i++) {
+    const angle = (i / 10) * Math.PI * 2;
+    const r = 44 + Math.random() * 10;
+    const dot = document.createElement("div");
+    dot.className = "success-burst";
+    dot.style.cssText = `
+      width:${5+Math.random()*4}px; height:${5+Math.random()*4}px;
+      background:${colors[i%colors.length]};
+      left:calc(50% - 3px); top:calc(50% - 3px);
+      --tx:${Math.cos(angle)*r}px; --ty:${Math.sin(angle)*r}px;
+      animation-delay:${i*0.03}s;
+    `;
+    wrap.appendChild(dot);
+    setTimeout(() => dot.remove(), 800);
+  }
+}
+
+function resetForm() {
+  ["f-prompt","f-model","f-tags","f-notes","f-prompt-th"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  });
+  document.getElementById("s3").checked = true;
+  document.getElementById("preview-img").style.display = "none";
+  document.getElementById("file-input").value = "";
+  document.getElementById("prompt-th-wrap").classList.remove("visible");
+  document.getElementById("translate-btn").disabled = false;
+  document.getElementById("translate-btn").classList.remove("loading");
+  document.getElementById("translate-hint").textContent = "ใช้ Claude AI แปลอัตโนมัติ";
+  selectedFile = null;
+}
+
+function toBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = e => res(e.target.result.split(",")[1]);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+
+// ── Copy field text (form fields) ────────────────────
+function copyFieldText(fieldId, btn) {
+  const val = document.getElementById(fieldId).value.trim();
+  if (!val) return toast("ไม่มีข้อความที่จะ copy", "⚠️");
+  navigator.clipboard.writeText(val).then(() => {
+    const orig = btn.innerHTML;
+    btn.classList.add("ok");
+    btn.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> OK`;
+    setTimeout(() => { btn.classList.remove("ok"); btn.innerHTML = orig; }, 2000);
+  }).catch(() => toast("Copy ไม่สำเร็จ", "⚠️"));
+}
+
+// ── Translate Prompt via Claude API ──────────────────
+async function translatePrompt() {
+  const prompt = document.getElementById("f-prompt").value.trim();
+  if (!prompt) return toast("กรุณาใส่ Prompt ก่อนแปล", "⚠️");
+
+  const btn      = document.getElementById("translate-btn");
+  const hint     = document.getElementById("translate-hint");
+  const thWrap   = document.getElementById("prompt-th-wrap");
+  const thBox    = document.getElementById("f-prompt-th");
+
+  btn.disabled = true;
+  btn.classList.add("loading");
+  document.getElementById("translate-btn-text").textContent = "กำลังแปล…";
+  hint.textContent = "Claude AI กำลังประมวลผล…";
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1000,
+        messages: [{
+          role: "user",
+          content: `แปลข้อความ AI image prompt ต่อไปนี้จากภาษาอังกฤษเป็นภาษาไทย ให้แปลตรงๆ และรักษาความหมายทางเทคนิคไว้ ตอบเฉพาะคำแปลภาษาไทยเท่านั้น ไม่ต้องมีคำอธิบายเพิ่มเติม:\n\n${prompt}`
+        }]
+      })
+    });
+
+    const data = await res.json();
+    const translated = data?.content?.[0]?.text || "";
+
+    if (!translated) throw new Error("ไม่ได้รับผลการแปล");
+
+    thBox.value = translated;
+    thWrap.classList.add("visible");
+    hint.textContent = "แปลสำเร็จ ✓";
+    toast("แปลภาษาสำเร็จ 🌐");
+
+  } catch (err) {
+    hint.textContent = "แปลไม่สำเร็จ: " + err.message;
+    toast("แปลไม่สำเร็จ", "⚠️");
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove("loading");
+    document.getElementById("translate-btn-text").textContent = "🌐 แปลเป็นภาษาไทย";
+  }
+}
+
+// ── Copy Prompt ───────────────────────────────────────
+function copyPrompt(e, prompt, btn) {
+  e.stopPropagation();
+  navigator.clipboard.writeText(prompt).then(() => {
+    btn.classList.add("copied");
+    btn.innerHTML = `
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+      COPIED!`;
+    setTimeout(() => {
+      btn.classList.remove("copied");
+      btn.innerHTML = `
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+        </svg>
+        COPY PROMPT`;
+    }, 2000);
+  }).catch(() => toast("Copy ไม่สำเร็จ", "⚠️"));
+}
+
+function copyDetailPrompt() {
+  const prompt = document.getElementById("d-prompt").textContent;
+  const btn    = document.getElementById("detail-copy-btn");
+  if (!prompt || prompt === "—") return toast("ไม่มี prompt ที่จะ copy", "⚠️");
+  navigator.clipboard.writeText(prompt).then(() => {
+    btn.style.background = "#2d6a4f";
+    btn.style.color      = "#fff";
+    btn.style.borderColor = "#2d6a4f";
+    btn.innerHTML = `
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+      COPIED!`;
+    setTimeout(() => {
+      btn.style.background  = "";
+      btn.style.color       = "";
+      btn.style.borderColor = "";
+      btn.innerHTML = `
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+        </svg>
+        COPY`;
+    }, 2000);
+  }).catch(() => toast("Copy ไม่สำเร็จ", "⚠️"));
+}
+
+// ── Detail Modal ──────────────────────────────────────
+function openDetail(r) {
+  const stars = n => "★".repeat(Math.max(0,Math.min(5,Number(n)||0))) + "☆".repeat(5-(Math.max(0,Math.min(5,Number(n)||0))));
+  document.getElementById("detail-img").src = r.imageUrl || "";
+  document.getElementById("d-prompt").textContent = r.prompt || "—";
+  document.getElementById("d-model").textContent  = r.model  || "—";
+  document.getElementById("d-rating").innerHTML   = `<span class="stars">${stars(r.rating)}</span>`;
+  document.getElementById("d-date").textContent   = r.timestamp ? new Date(r.timestamp).toLocaleDateString("th-TH",{year:"numeric",month:"long",day:"numeric"}) : "—";
+  const tagsEl = document.getElementById("d-tags");
+  tagsEl.innerHTML = (r.tags||"").split(",").map(t=>t.trim()).filter(Boolean)
+    .map(t=>`<span class="card-tag" style="font-size:.75rem">${t}</span>`).join("") || "—";
+
+  // promptTh
+  const promptThWrap = document.getElementById("d-promptTh-wrap");
+  const promptThEl   = document.getElementById("d-promptTh");
+  if (r.promptTh) {
+    promptThEl.textContent = r.promptTh;
+    promptThWrap.style.display = "";
+  } else {
+    promptThWrap.style.display = "none";
+  }
+
+  // notes
+  const notesWrap = document.getElementById("d-notes-wrap");
+  const notesEl   = document.getElementById("d-notes");
+  if (r.notes) {
+    notesEl.textContent = r.notes;
+    notesWrap.style.display = "";
+  } else {
+    notesWrap.style.display = "none";
+  }
+
+  document.getElementById("detail-modal").classList.remove("hidden");
+}
+function closeDetail(e) {
+  if (e.target === document.getElementById("detail-modal"))
+    document.getElementById("detail-modal").classList.add("hidden");
+}
+
+// ── Toast ─────────────────────────────────────────────
+function toast(msg, icon="✓") {
+  const el = document.getElementById("toast");
+  el.textContent = icon + " " + msg;
+  el.classList.add("show");
+  setTimeout(() => el.classList.remove("show"), 3000);
+}
+
+// ── Export CSV ────────────────────────────────────────
+const CSV_COLS = [
+  { key: "id",          label: "ID" },
+  { key: "timestamp",   label: "Date" },
+  { key: "prompt",      label: "Prompt (EN)" },
+  { key: "promptTh",    label: "Prompt (TH)" },
+  { key: "model",       label: "Model" },
+  { key: "tags",        label: "Tags" },
+  { key: "rating",      label: "Rating" },
+  { key: "notes",       label: "Notes" },
+  { key: "imageUrl",    label: "Image URL" },
+  { key: "driveFileId", label: "Drive File ID" },
+];
+
+let exportScope    = "all";
+let selectedCols   = new Set(CSV_COLS.map(c => c.key));
+
+function openExport() {
+  if (!allRecords.length) return toast("ยังไม่มีข้อมูล กด Refresh ก่อนครับ", "⚠️");
+  buildColGrid();
+  updatePreview();
+  document.getElementById("export-modal").classList.remove("hidden");
+}
+
+function closeExportBackdrop(e) {
+  if (e.target === document.getElementById("export-modal"))
+    document.getElementById("export-modal").classList.add("hidden");
+}
+
+function buildColGrid() {
+  const grid = document.getElementById("col-grid");
+  grid.innerHTML = CSV_COLS.map(c => `
+    <label class="export-col-item">
+      <input type="checkbox" data-key="${c.key}" ${selectedCols.has(c.key) ? "checked" : ""}
+        onchange="onColToggle(this)">
+      <span>${c.label}</span>
+    </label>
+  `).join("");
+}
+
+function onColToggle(el) {
+  el.checked ? selectedCols.add(el.dataset.key) : selectedCols.delete(el.dataset.key);
+  updatePreview();
+}
+
+function toggleAllCols(on) {
+  selectedCols = on ? new Set(CSV_COLS.map(c => c.key)) : new Set();
+  buildColGrid();
+  updatePreview();
+}
+
+function setScope(s) {
+  exportScope = s;
+  ["all","filtered","rated"].forEach(id =>
+    document.getElementById("scope-" + id).classList.toggle("active", id === s)
+  );
+  updatePreview();
+}
+
+function getScopedRecords() {
+  if (exportScope === "filtered") {
+    // ใช้ records ที่กรองอยู่ในหน้าจอ
+    const q = document.getElementById("search").value.toLowerCase();
+    return allRecords.filter(r => {
+      const matchTag  = !activeTag || (r.tags||"").split(",").map(t=>t.trim()).includes(activeTag);
+      const matchText = !q || (r.prompt+r.model+r.tags).toLowerCase().includes(q);
+      return matchTag && matchText;
+    });
+  }
+  if (exportScope === "rated") return allRecords.filter(r => Number(r.rating) >= 4);
+  return allRecords;
+}
+
+function escapeCSV(val) {
+  const s = String(val ?? "").replace(/"/g, '""');
+  return /[",\n\r]/.test(s) ? `"${s}"` : s;
+}
+
+function buildCSV(records) {
+  const cols = CSV_COLS.filter(c => selectedCols.has(c.key));
+  if (!cols.length) return "";
+  const header = cols.map(c => escapeCSV(c.label)).join(",");
+  const rows   = records.map(r => cols.map(c => escapeCSV(r[c.key])).join(","));
+  return [header, ...rows].join("\r\n");
+}
+
+function updatePreview() {
+  const scoped = getScopedRecords();
+  const cols   = CSV_COLS.filter(c => selectedCols.has(c.key));
+  document.getElementById("ex-total").textContent       = allRecords.length;
+  document.getElementById("ex-scope-count").textContent = scoped.length;
+  document.getElementById("ex-col-count").textContent   = cols.length;
+
+  if (!cols.length) {
+    document.getElementById("csv-preview").textContent = "— เลือก column อย่างน้อย 1 อัน —";
+    return;
+  }
+  const preview = buildCSV(scoped.slice(0, 2));
+  document.getElementById("csv-preview").textContent = preview || "— ไม่มีข้อมูล —";
+}
+
+function doExport() {
+  const cols = CSV_COLS.filter(c => selectedCols.has(c.key));
+  if (!cols.length) return toast("เลือก column อย่างน้อย 1 อัน", "⚠️");
+  const scoped = getScopedRecords();
+  if (!scoped.length) return toast("ไม่มีข้อมูลในขอบเขตที่เลือก", "⚠️");
+
+  const csv      = buildCSV(scoped);
+  const bom      = "\uFEFF";                          // BOM → Excel เปิดภาษาไทยถูก
+  const blob     = new Blob([bom + csv], { type: "text/csv;charset=utf-8;" });
+  const url      = URL.createObjectURL(blob);
+  const filename = document.getElementById("export-filename").value.trim() || "export.csv";
+
+  const a  = document.createElement("a");
+  a.href   = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+
+  toast(`Export สำเร็จ ${scoped.length} records (${cols.length} columns) 🎉`);
+  document.getElementById("export-modal").classList.add("hidden");
+}
+
+// ── ESC closes modals ─────────────────────────────────
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") {
+    closeUpload();
+    document.getElementById("detail-modal").classList.add("hidden");
+    document.getElementById("export-modal").classList.add("hidden");
+  }
+});
+
+// ── PWA: Service Worker ───────────────────────────────
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js")
+      .then(reg => console.log("SW registered:", reg.scope))
+      .catch(err => console.log("SW error:", err));
+  });
+}
+
+// ── PWA: Install prompt ───────────────────────────────
+let deferredPrompt = null;
+window.addEventListener("beforeinstallprompt", e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  showInstallBanner();
+});
+
+function showInstallBanner() {
+  const banner = document.getElementById("install-banner");
+  if (banner) banner.style.display = "flex";
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const installBtn = document.getElementById("install-btn");
+  if (installBtn) {
+    installBtn.addEventListener("click", async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      document.getElementById("install-banner").style.display = "none";
+      if (outcome === "accepted") toast("ติดตั้งแอปสำเร็จ 🎉");
+    });
+  }
+  const dismissBtn = document.getElementById("install-dismiss");
+  if (dismissBtn) {
+    dismissBtn.addEventListener("click", () => {
+      document.getElementById("install-banner").style.display = "none";
+    });
+  }
+});
+</script>
+</body>
+</html>
